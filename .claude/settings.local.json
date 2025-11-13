@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s /b \"C:\\Users\\sumedh\\OneDrive - Georgia Institute of Technology\\Python\\Anthropic Hackathon - AI Apply\")",
+      "Bash(findstr /E \"\\.(html|css|js|jsx|ts|tsx|vue)$\")",
+      "Bash(dir /b)",
+      "Bash(find \"C:\\Users\\sumedh\\OneDrive - Georgia Institute of Technology\\Python\\Anthropic Hackathon - AI Apply\" -type f ( -name \"*.bak\" -o -name \"*.backup\" -o -name \"*.old\" -o -name \"*backup*\" -o -name \"*old*\" -o -name \"*~\" ))",
+      "Bash(find \"C:\\Users\\sumedh\\OneDrive - Georgia Institute of Technology\\Python\\Anthropic Hackathon - AI Apply\" -type f ( -name \"*backup*\" -o -name \"*old*\" -o -name \"*.bak\" ))",
+      "Bash(dir /b templates)",
+      "Bash(python -m py_compile \"C:\\Users\\sumedh\\OneDrive - Georgia Institute of Technology\\Python\\Anthropic Hackathon - AI Apply\\templates\\dashboard.html\")",
+      "Bash(dir /b *.py)",
+      "mcp__ide__getDiagnostics",
+      "Bash(findstr /N /C:\"tab-button\" \"C:\\Users\\sumedh\\OneDrive - Georgia Institute of Technology\\Python\\Anthropic Hackathon - AI Apply\\templates\\dashboard.html\")",
+      "Bash(sqlite3:*)",
+      "Bash(python:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(where:*)",
+      "Bash(dir \"%LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe\")",
+      "Bash(netstat:*)",
+      "Bash(dir:*)",
+      "Bash(timeout 3 python:*)",
+      "Bash(del \"C:\\Users\\sumedh\\OneDrive - Georgia Institute of Technology\\Python\\Anthropic Hackathon - AI Apply\\test_resume_upload.py\")",
+      "Bash(pip install:*)",
+      "Bash(timeout 45 python:*)",
+      "Bash(pdflatex:*)",
+      "Bash(initexmf:*)",
+      "Bash(del /Q \"C:\\Users\\sumedh\\OneDrive - Georgia Institute of Technology\\Python\\Anthropic Hackathon - AI Apply\\generated_resumes\\*.*\")",
+      "Bash(git checkout:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

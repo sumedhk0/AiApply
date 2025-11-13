@@ -1,0 +1,1797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AI Apply</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            padding: 24px;
+            line-height: 1.6;
+        }
+
+        .page-header {
+            max-width: 1200px;
+            margin: 0 auto 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+
+        .welcome-section {
+            color: white;
+        }
+
+        .welcome-section h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .welcome-section p {
+            font-size: 14px;
+            opacity: 0.95;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .header-btn {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 12px 24px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s ease, border-color 0.2s ease;
+            cursor: pointer;
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-width: 1200px;
+            width: 100%;
+            padding: 48px;
+            margin: 0 auto;
+        }
+
+        .app-title {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .app-title h2 {
+            color: var(--text-primary);
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .app-title p {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 40px;
+            padding: 6px;
+            background: #f8fafc;
+            border-radius: 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab-button {
+            padding: 14px 32px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .tab-button:hover {
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .tab-button.active {
+            color: white;
+            background: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 28px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .section-title {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+            background: white;
+            color: var(--text-primary);
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        input[type="file"] {
+            cursor: pointer;
+            padding: 16px;
+        }
+
+        input[type="file"]::file-selector-button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 12px;
+            transition: background 0.2s ease;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background: var(--primary-dark);
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+
+        .info-card {
+            background: #e0f2fe;
+            border: 2px solid #bae6fd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .info-card.success {
+            background: #dcfce7;
+            border-color: #86efac;
+        }
+
+        .info-card.warning {
+            background: #fef3c7;
+            border-color: #fde68a;
+        }
+
+        .info-card.error {
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+
+        .info-card strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #4b5563;
+        }
+
+        .btn-success {
+            background: var(--success);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: var(--error);
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #dc2626;
+        }
+
+        .progress-container {
+            margin-top: 32px;
+            padding: 24px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            display: none;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .progress-title {
+            font-weight: 700;
+            color: var(--text-primary);
+            font-size: 19px;
+        }
+
+        .progress-badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 16px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .progress-item {
+            padding: 12px 16px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid var(--primary);
+            font-size: 15px;
+        }
+
+        .progress-item.success {
+            border-left-color: var(--success);
+            background: #f0fdf4;
+        }
+
+        .progress-item.error {
+            border-left-color: var(--error);
+            background: #fef2f2;
+        }
+
+        .flash-messages {
+            margin-bottom: 24px;
+        }
+
+        .flash {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 15px;
+            font-weight: 500;
+            border-left: 4px solid;
+        }
+
+        .flash.success {
+            background: #dcfce7;
+            color: #15803d;
+            border-color: var(--success);
+        }
+
+        .flash.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: var(--error);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 32px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 520px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .close {
+            color: var(--text-secondary);
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+        }
+
+        .close:hover {
+            color: var(--text-primary);
+        }
+
+        .contacts-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 10px;
+            margin-top: 24px;
+        }
+
+        .contacts-table th {
+            background: #f1f5f9;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: none;
+        }
+
+        .contacts-table th:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+
+        .contacts-table th:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+
+        .contacts-table td {
+            padding: 14px 16px;
+            border: none;
+            font-size: 15px;
+            background: white;
+        }
+
+        .contacts-table tbody tr {
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .contacts-table tbody tr td:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+
+        .contacts-table tbody tr td:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+
+        .contacts-table tbody tr:hover {
+            background: #fafafa;
+        }
+
+        .no-contacts {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+
+        .stat-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--primary);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, var(--border) 20%, var(--border) 80%, transparent 100%);
+            margin: 40px 0;
+            border-radius: 2px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+
+            .container {
+                padding: 24px;
+                border-radius: 16px;
+            }
+
+            .page-header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .welcome-section h1 {
+                font-size: 24px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+
+            .tab-button {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body data-sender-email="{{ user.sender_email or '' }}" data-sender-password="{{ user.sender_password or '' }}" data-has-resume="{{ 'true' if user.resume_filename else 'false' }}" data-has-transcript="{{ 'true' if user.transcript_filename else 'false' }}">
+    <div class="page-header">
+        <div class="welcome-section">
+            <h1>Welcome back, {{ user.username }}!</h1>
+            <p>Automate your job search with AI-powered outreach</p>
+        </div>
+        <div class="header-actions">
+            <a href="/settings" class="header-btn">Settings</a>
+            <a href="/logout" class="header-btn">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="app-title">
+            <h2>AI Apply</h2>
+            <p>Smart internship outreach powered by Claude AI</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('campaign')">Email Campaign</button>
+            <button class="tab-button" onclick="switchTab('handshake')">Handshake DMs</button>
+            <button class="tab-button" onclick="switchTab('jobapply')">Job Applications</button>
+            <button class="tab-button" onclick="switchTab('resume')">Documents</button>
+        </div>
+
+        <!-- Campaign Tab Content -->
+        <div id="campaign-tab" class="tab-content active">
+            <form action="/submit" method="POST" enctype="multipart/form-data" id="emailForm">
+                <div class="section-header">
+                    <div class="section-title">Campaign Settings</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="city">Target City</label>
+                        <input type="text" id="city" name="city"
+                               value="{{ user.location.split(',')[0].strip() if user.location and ',' in user.location else user.location }}"
+                               placeholder="e.g., San Francisco" required>
+                        <div class="help-text">City where you're looking for opportunities</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="state">State</label>
+                        <input type="text" id="state" name="state"
+                               value="{{ user.location.split(',')[1].strip() if user.location and ',' in user.location else '' }}"
+                               placeholder="e.g., CA, Texas, NY" required>
+                        <div class="help-text">State or abbreviation</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="industry">Target Industry</label>
+                    <input type="text" id="industry" name="industry"
+                           value="{{ user.industry }}"
+                           placeholder="e.g., Clean Tech, SaaS, AI/ML, FinTech" required>
+                    <div class="help-text">Industry or sector you want to target</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="num_emails">Number of Emails</label>
+                        <input type="number" id="num_emails" name="num_emails"
+                               value="{{ user.num_emails if user.num_emails else 5 }}"
+                               min="1" max="50" required>
+                        <div class="help-text">How many companies to contact (1-50)</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="resume_status">Resume Status</label>
+                        {% if user.resume_filename %}
+                            <div class="info-card success">
+                                <strong>Resume uploaded:</strong> {{ get_original_resume_name(user) }}
+                                <br>
+                                <button type="button" onclick="switchTab('resume')" class="btn btn-secondary" style="margin-top: 12px; width: auto; padding: 8px 16px; font-size: 13px;">
+                                    Manage Resume
+                                </button>
+                            </div>
+                        {% else %}
+                            <div class="info-card warning">
+                                <strong>No resume uploaded</strong>
+                                <p style="margin: 8px 0;">Please upload your resume to start sending applications</p>
+                                <button type="button" onclick="switchTab('resume')" class="btn" style="width: auto; padding: 10px 20px; font-size: 13px;">
+                                    Upload Resume Now
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="custom_message">Custom Message (Optional)</label>
+                    <textarea id="custom_message" name="custom_message"
+                              placeholder="Add any specific talking points, skills, or requirements you'd like to highlight in your outreach emails...">{{ user.custom_message }}</textarea>
+                    <div class="help-text">AI will incorporate this into personalized emails for each company</div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="section-header">
+                    <div class="section-title">Email Configuration</div>
+                </div>
+
+                <div class="form-group">
+                    <button type="button" class="btn btn-secondary" id="openCredentialsModal" style="width: auto;">
+                        Configure Email Credentials
+                    </button>
+                    <span class="stat-badge" style="margin-left: 16px;">
+                        {% if user.sender_email and user.sender_password %}
+                            ✓ Configured
+                        {% else %}
+                            Not Configured
+                        {% endif %}
+                    </span>
+                    <div class="help-text" style="margin-top: 12px;">
+                        {% if user.sender_email %}
+                            Using email: <strong>{{ user.sender_email }}</strong>
+                        {% else %}
+                            Set up your email credentials to send applications
+                        {% endif %}
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">Launch Campaign</button>
+            </form>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-header">
+                    <div class="progress-title">Campaign Progress</div>
+                    <span class="progress-badge" id="emailCount">0 emails sent</span>
+                </div>
+                <div id="progressLog"></div>
+            </div>
+        </div>
+        <!-- End Campaign Tab -->
+
+        <!-- Handshake DM Tab Content -->
+        <div id="handshake-tab" class="tab-content">
+            <form id="handshakeForm">
+                <div class="section-header">
+                    <div class="section-title">Handshake DM Campaign</div>
+                </div>
+
+                <div class="info-card">
+                    <strong>About Handshake DMs:</strong> This feature automates sending direct messages to hiring managers on Handshake.
+                    You'll need to log into Handshake manually in the browser window that opens, then click the confirmation button to continue.
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="handshake_city">Target City</label>
+                        <input type="text" id="handshake_city" name="city"
+                               value="{{ user.handshake_city }}"
+                               placeholder="e.g., San Francisco, CA" required>
+                        <div class="help-text">City and state where you're looking for opportunities</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="num_dms">Number of DMs</label>
+                        <input type="number" id="num_dms" name="num_dms"
+                               value="{{ user.handshake_num_dms if user.handshake_num_dms else 10 }}"
+                               min="1" max="50" required>
+                        <div class="help-text">How many companies to contact (1-50)</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="desired_job_field">Target Industry/Field</label>
+                    <input type="text" id="desired_job_field" name="desired_job_field"
+                           value="Clean Tech"
+                           placeholder="e.g., Clean Tech, Software Engineering, Finance" required>
+                    <div class="help-text">AI will match this to Handshake's industry categories</div>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="filter_internships_only" name="filter_internships_only"
+                               style="margin-right: 8px; width: auto; cursor: pointer;">
+                        <span>Filter for internships only</span>
+                    </label>
+                    <div class="help-text">Check this to only contact companies with internship postings</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="handshake_custom_message">Custom Message (Optional)</label>
+                    <textarea id="handshake_custom_message" name="custom_message"
+                              placeholder="Add any specific talking points, skills, or requirements you'd like to highlight in your DMs...">{{ user.custom_message }}</textarea>
+                    <div class="help-text">AI will incorporate this into personalized messages for each company</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="handshake_resume_status">Resume Status</label>
+                    {% if user.resume_filename %}
+                        <div class="info-card success">
+                            <strong>Resume uploaded:</strong> {{ get_original_resume_name(user) }}
+                            <br>
+                            <button type="button" onclick="switchTab('resume')" class="btn btn-secondary" style="margin-top: 12px; width: auto; padding: 8px 16px; font-size: 13px;">
+                                Manage Resume
+                            </button>
+                        </div>
+                    {% else %}
+                        <div class="info-card warning">
+                            <strong>No resume uploaded</strong>
+                            <p style="margin: 8px 0;">Please upload your resume to start sending DMs</p>
+                            <button type="button" onclick="switchTab('resume')" class="btn" style="width: auto; padding: 10px 20px; font-size: 13px;">
+                                Upload Resume Now
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn" id="submitHandshakeBtn">Launch Handshake Campaign</button>
+            </form>
+
+            <div class="progress-container" id="handshakeProgressContainer">
+                <div class="progress-header">
+                    <div class="progress-title">Handshake Campaign Progress</div>
+                    <span class="progress-badge" id="dmCount">0 DMs sent</span>
+                </div>
+                <div id="handshakeProgressLog"></div>
+                <div id="loginButtonContainer" style="display: none; margin-top: 20px; text-align: center;">
+                    <button type="button" class="btn btn-success" id="confirmLoginBtn" style="width: auto; padding: 16px 32px;">
+                        I'm Logged In - Continue Campaign
+                    </button>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            
+        </div>
+        <!-- End Handshake DM Tab -->
+
+        <!-- Job Applications Tab Content -->
+        <div id="jobapply-tab" class="tab-content">
+            <form id="jobApplicationForm">
+                <div class="section-header">
+                    <div class="section-title">Handshake Job Applications</div>
+                </div>
+
+                <div class="info-card">
+                    <strong>About Job Applications:</strong> This feature helps you apply to jobs on Handshake.
+                    Filter jobs by industry, location, and role. You'll need to log into Handshake manually in the browser window that opens, then click the confirmation button to continue.
+                </div>
+
+                <div class="form-group">
+                    <label for="job_location">Target Location</label>
+                    <input type="text" id="job_location" name="location"
+                           value="{{ user.location }}"
+                           placeholder="e.g., San Francisco, CA" required>
+                    <div class="help-text">City and state where you're looking for jobs</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="job_industry">Target Industry (Optional)</label>
+                    <input type="text" id="job_industry" name="industry"
+                           value="{{ user.industry }}"
+                           placeholder="e.g., Clean Tech, Software, Finance">
+                    <div class="help-text">AI will match this to Handshake's industry categories (leave blank for all industries)</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="job_role">Target Role</label>
+                    <input type="text" id="job_role" name="role"
+                           placeholder="e.g., Software Engineer, Data Analyst, Product Manager" required>
+                    <div class="help-text">Specific role or job title you're looking for</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="jobapply_resume_status">Resume Status</label>
+                    {% if user.resume_filename %}
+                        <div class="info-card success">
+                            <strong>Resume uploaded:</strong> {{ get_original_resume_name(user) }}
+                            <br>
+                            <button type="button" onclick="switchTab('resume')" class="btn btn-secondary" style="margin-top: 12px; width: auto; padding: 8px 16px; font-size: 13px;">
+                                Manage Resume
+                            </button>
+                        </div>
+                    {% else %}
+                        <div class="info-card warning">
+                            <strong>No resume uploaded</strong>
+                            <p style="margin: 8px 0;">Please upload your resume to start applying to jobs</p>
+                            <button type="button" onclick="switchTab('resume')" class="btn" style="width: auto; padding: 10px 20px; font-size: 13px;">
+                                Upload Resume Now
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="jobapply_transcript_status">Transcript Status <span style="color: var(--error); font-weight: 700;">*Required</span></label>
+                    {% if user.transcript_filename %}
+                        <div class="info-card success" style="border-left: 4px solid var(--success);">
+                            <strong style="color: var(--success);">Transcript uploaded:</strong> {{ user.transcript_filename.split('_', 2)[-1] if user.transcript_filename else 'Unknown' }}
+                            <br>
+                            <button type="button" onclick="switchTab('resume')" class="btn" style="margin-top: 12px; width: auto; padding: 8px 16px; font-size: 13px; background: var(--success); color: white;">
+                                Manage Transcript
+                            </button>
+                        </div>
+                    {% else %}
+                        <div class="info-card error" style="border-left: 4px solid var(--error);">
+                            <strong style="color: var(--error);">No transcript uploaded - Required!</strong>
+                            <p style="margin: 8px 0; color: var(--text-secondary);">You must upload your official transcript to apply to jobs on Handshake</p>
+                            <button type="button" onclick="switchTab('resume')" class="btn" style="width: auto; padding: 10px 20px; font-size: 13px; background: var(--error); color: white; font-weight: 600;">
+                                Upload Transcript Now
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn" id="submitJobApplicationBtn" {% if not user.transcript_filename %}disabled title="Please upload a transcript first"{% endif %}>
+                    Start Job Application Session
+                </button>
+            </form>
+
+            <div class="progress-container" id="jobApplicationProgressContainer">
+                <div class="progress-header">
+                    <div class="progress-title">Job Application Progress</div>
+                </div>
+                <div id="jobApplicationProgressLog"></div>
+                <div id="jobApplicationLoginButtonContainer" style="display: none; margin-top: 20px; text-align: center;">
+                    <button type="button" class="btn btn-success" id="confirmJobApplicationLoginBtn" style="width: auto; padding: 16px 32px;">
+                        I'm Logged In - Continue
+                    </button>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+        </div>
+        <!-- End Job Applications Tab -->
+
+        <!-- Documents Management Tab -->
+        <div id="resume-tab" class="tab-content">
+            <div class="section-header">
+                <div class="section-title">Document Management</div>
+            </div>
+
+            <!-- RESUME SECTION -->
+            <div style="margin-bottom: 48px;">
+                <h2 style="color: var(--text-primary); margin-bottom: 24px; font-size: 20px; font-weight: 600;">Resume</h2>
+
+            <div id="resumeStatusContainer" style="margin-bottom: 32px;">
+                <div id="noResumeSection" style="display: none;">
+                    <div class="info-card warning" style="text-align: center;">
+                        <h3 style="color: var(--text-primary); margin-bottom: 12px;">No resume uploaded yet</h3>
+                        <p>Upload your resume to enable AI-powered job applications</p>
+                    </div>
+                </div>
+
+                <div id="hasResumeSection" style="display: none;">
+                    <div class="info-card success">
+                        <div style="display: flex; justify-content: space-between; align-items: start; gap: 20px;">
+                            <div style="flex: 1;">
+                                <h3 style="color: var(--text-primary); margin-bottom: 8px;">Current Resume</h3>
+                                <p style="margin: 0; font-weight: 600;" id="resumeFilename">Loading...</p>
+                                <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);" id="resumeFileSize">Size: Loading...</p>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button type="button" onclick="downloadResume()" class="btn btn-success" style="width: auto; padding: 10px 20px;">
+                                    Download
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section-header">
+                <div class="section-title">My Resumes</div>
+                <span class="stat-badge" id="resumesCount">0 resumes</span>
+            </div>
+
+            <div id="resumesListContainer">
+                <div class="table-wrapper">
+                    <table class="contacts-table">
+                        <thead>
+                            <tr>
+                                <th>Resume Name</th>
+                                <th>File Size</th>
+                                <th>Upload Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resumesTableBody">
+                            <tr>
+                                <td colspan="4" class="no-contacts">Loading resumes...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section-header">
+                <div class="section-title">Upload New Resume</div>
+            </div>
+
+            <form id="resumeUploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="resume_upload">Choose Resume PDF</label>
+                    <input type="file" id="resume_upload" name="resume" accept=".pdf" required style="padding: 14px;">
+                    <div class="help-text">Maximum file size: 25MB. Only PDF files are accepted.</div>
+                </div>
+
+                <button type="submit" class="btn" id="uploadResumeBtn">Upload Resume</button>
+            </form>
+
+            <div class="progress-container" id="resumeProgressContainer">
+                <div id="resumeProgressLog"></div>
+            </div>
+            </div>
+            <!-- End Resume Section -->
+
+            <div class="divider" style="margin: 48px 0;"></div>
+
+            <!-- TRANSCRIPT SECTION -->
+            <div style="margin-bottom: 48px;">
+                <h2 style="color: var(--text-primary); margin-bottom: 8px; font-size: 20px; font-weight: 600;">
+                    Transcript <span style="color: var(--error); font-size: 16px; font-weight: 700;">*Required for Job Applications</span>
+                </h2>
+                <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px;">
+                    Your official transcript is required to use the Handshake Job Application feature
+                </p>
+
+                <div id="transcriptStatusContainer" style="margin-bottom: 32px;">
+                    <div id="noTranscriptSection" style="display: none;">
+                        <div class="info-card error" style="text-align: center; border-left: 4px solid var(--error);">
+                            <h3 style="color: var(--error); margin-bottom: 12px; font-weight: 600;">No Transcript Uploaded</h3>
+                            <p style="color: var(--text-secondary); margin-bottom: 0;">You must upload your official transcript to use Handshake Job Applications</p>
+                        </div>
+                    </div>
+
+                    <div id="transcriptInfoSection" style="display: none;">
+                        <div class="info-card success" style="border-left: 4px solid var(--success);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 24px;">
+                                <div style="flex: 1;">
+                                    <h3 style="color: var(--success); margin-bottom: 8px; font-weight: 600;">Transcript Uploaded Successfully</h3>
+                                    <p style="color: var(--text-primary); margin-bottom: 4px; font-weight: 500;" id="transcriptFilename">No transcript</p>
+                                    <p style="color: var(--text-secondary); font-size: 14px;" id="transcriptFileSize"></p>
+                                </div>
+                                <div style="display: flex; gap: 12px;">
+                                    <a href="/download_transcript" class="btn" style="text-decoration: none; background: var(--primary); color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; transition: all 0.2s ease; display: inline-block;">
+                                        Download
+                                    </a>
+                                    <button type="button" class="btn" onclick="deleteTranscript()" style="background: white; color: var(--error); border: 2px solid var(--error); padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="transcriptUploadForm" enctype="multipart/form-data" style="margin-bottom: 24px;">
+                    <div class="form-group">
+                        <label for="transcript" style="font-weight: 600; color: var(--text-primary);">Upload/Replace Transcript</label>
+                        <input type="file" id="transcript" name="transcript" accept=".pdf" required style="padding: 12px; border: 2px dashed var(--border); border-radius: 8px; background: var(--card-bg); cursor: pointer; transition: border-color 0.2s ease;">
+                        <p class="help-text" style="margin-top: 8px;">Upload your official transcript PDF (max 25MB)</p>
+                    </div>
+                    <button type="submit" class="btn" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 14px 32px; border-radius: 8px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; box-shadow: var(--shadow-md); transition: all 0.2s ease;">
+                        Upload Transcript
+                    </button>
+                </form>
+
+                <div class="progress-container" id="transcriptProgressContainer">
+                    <div id="transcriptProgressLog"></div>
+                </div>
+            </div>
+            <!-- End Transcript Section -->
+
+        </div>
+        <!-- End Documents Management Tab -->
+
+    </div>
+
+    <!-- Email Credentials Modal -->
+    <div id="credentialsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Email Credentials</div>
+                <button class="close" id="closeModal">&times;</button>
+            </div>
+            <form id="credentialsForm">
+                <div class="form-group">
+                    <label for="modal_sender_email">Your Email Address</label>
+                    <input type="email" id="modal_sender_email" name="sender_email"
+                           value="{{ user.sender_email }}"
+                           placeholder="your.email@example.com" required>
+                    <div class="help-text">SMTP server will be automatically detected</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal_sender_password">Email Password</label>
+                    <input type="password" id="modal_sender_password" name="sender_password"
+                           value="{{ user.sender_password }}"
+                           placeholder="Your email password or app password" required>
+                    <div class="help-text">For Gmail, use an app-specific password</div>
+                </div>
+
+                <button type="button" class="btn" id="saveCredentials">Save Credentials</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Read configuration from data attributes
+        const userConfig = {
+            senderEmail: document.body.dataset.senderEmail || null,
+            senderPassword: document.body.dataset.senderPassword || null,
+            hasResume: document.body.dataset.hasResume === 'true',
+            hasTranscript: document.body.dataset.hasTranscript === 'true'
+        };
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabName === 'resume') {
+                loadResumeStatus();
+                loadResumesList();
+                loadTranscriptStatus();
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            if (userConfig.senderEmail && userConfig.senderPassword) {
+                let emailField = document.getElementById('sender_email');
+                let passwordField = document.getElementById('sender_password');
+
+                if (!emailField) {
+                    emailField = document.createElement('input');
+                    emailField.type = 'hidden';
+                    emailField.id = 'sender_email';
+                    emailField.name = 'sender_email';
+                    document.getElementById('emailForm').appendChild(emailField);
+                }
+
+                if (!passwordField) {
+                    passwordField = document.createElement('input');
+                    passwordField.type = 'hidden';
+                    passwordField.id = 'sender_password';
+                    passwordField.name = 'sender_password';
+                    document.getElementById('emailForm').appendChild(passwordField);
+                }
+
+                emailField.value = userConfig.senderEmail;
+                passwordField.value = userConfig.senderPassword;
+            }
+        });
+
+        // Modal functionality
+        const modal = document.getElementById('credentialsModal');
+        document.getElementById('openCredentialsModal').onclick = () => modal.classList.add('active');
+        document.getElementById('closeModal').onclick = () => modal.classList.remove('active');
+        window.onclick = (e) => { if (e.target == modal) modal.classList.remove('active'); }
+
+        document.getElementById('saveCredentials').onclick = function() {
+            const email = document.getElementById('modal_sender_email').value;
+            const password = document.getElementById('modal_sender_password').value;
+
+            if (!email || !password) {
+                alert('Please fill in both email and password');
+                return;
+            }
+
+            let emailField = document.getElementById('sender_email') || document.createElement('input');
+            let passwordField = document.getElementById('sender_password') || document.createElement('input');
+
+            emailField.type = 'hidden';
+            emailField.id = 'sender_email';
+            emailField.name = 'sender_email';
+            emailField.value = email;
+
+            passwordField.type = 'hidden';
+            passwordField.id = 'sender_password';
+            passwordField.name = 'sender_password';
+            passwordField.value = password;
+
+            document.getElementById('emailForm').appendChild(emailField);
+            document.getElementById('emailForm').appendChild(passwordField);
+
+            modal.classList.remove('active');
+            alert('Email credentials saved successfully!');
+            location.reload();
+        }
+
+        // Form submission
+        let eventSource = null;
+        document.getElementById('emailForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!userConfig.hasResume) {
+                alert('Please upload a resume in the Resume tab before starting a campaign');
+                return;
+            }
+
+            const email = document.getElementById('sender_email');
+            const password = document.getElementById('sender_password');
+
+            if (!email || !password || !email.value || !password.value) {
+                alert('Please configure your email credentials first');
+                return;
+            }
+
+            const city = document.getElementById('city').value.trim();
+            const state = document.getElementById('state').value.trim();
+
+            if (!city || !state) {
+                alert('Please enter both city and state');
+                return;
+            }
+
+            const location = city + ', ' + state;
+
+            document.getElementById('progressContainer').classList.add('active');
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = 'Running Campaign...';
+            document.getElementById('progressLog').innerHTML = '';
+            document.getElementById('emailCount').textContent = '0 emails sent';
+
+            const formData = new FormData(this);
+            formData.delete('city');
+            formData.delete('state');
+            formData.set('location', location);
+
+            fetch('/submit', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+            .then(data => {
+                if (data.task_id) startProgressTracking(data.task_id);
+            })
+            .catch(error => {
+                addProgressItem('Error: ' + error.message, 'error');
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = 'Launch Campaign';
+            });
+        });
+
+        function startProgressTracking(taskId) {
+            eventSource = new EventSource('/progress/' + taskId);
+
+            eventSource.addEventListener('message', function(e) {
+                const data = JSON.parse(e.data);
+                addProgressItem(data.message, data.type || 'in-progress');
+
+                if (data.email_count !== undefined) {
+                    document.getElementById('emailCount').textContent = data.email_count + ' emails sent';
+                }
+
+                if (data.complete) {
+                    eventSource.close();
+                    document.getElementById('submitBtn').disabled = false;
+                    document.getElementById('submitBtn').textContent = 'Launch Campaign';
+                }
+            });
+
+            eventSource.addEventListener('error', function(e) {
+                console.error('EventSource error:', e);
+                eventSource.close();
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = 'Launch Campaign';
+            });
+        }
+
+        function addProgressItem(message, type) {
+            const progressLog = document.getElementById('progressLog');
+            const item = document.createElement('div');
+            item.className = 'progress-item ' + type;
+            item.textContent = message;
+            progressLog.appendChild(item);
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+
+        // Resume management
+        function loadResumeStatus() {
+            fetch('/api/view_resume')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.has_resume) {
+                        document.getElementById('noResumeSection').style.display = 'none';
+                        document.getElementById('hasResumeSection').style.display = 'block';
+                        document.getElementById('resumeFilename').textContent = data.filename;
+                        document.getElementById('resumeFileSize').textContent = 'Size: ' + data.file_size;
+                    } else {
+                        document.getElementById('noResumeSection').style.display = 'block';
+                        document.getElementById('hasResumeSection').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading resume:', error);
+                });
+        }
+
+        document.getElementById('resumeUploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const uploadBtn = document.getElementById('uploadResumeBtn');
+            const progressContainer = document.getElementById('resumeProgressContainer');
+            const progressLog = document.getElementById('resumeProgressLog');
+
+            const fileInput = document.getElementById('resume_upload');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a PDF file to upload');
+                return;
+            }
+
+            progressContainer.classList.add('active');
+            progressLog.innerHTML = '';
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+
+            addResumeProgressItem('Uploading resume...', 'in-progress');
+
+            fetch('/api/upload_resume', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addResumeProgressItem('Resume uploaded successfully!', 'success');
+                    fileInput.value = '';
+                    setTimeout(() => {
+                        loadResumeStatus();
+                        loadResumesList();
+                        progressContainer.classList.remove('active');
+                        // Update the page to reflect new resume
+                        location.reload();
+                    }, 1500);
+                } else {
+                    addResumeProgressItem('Error: ' + (data.error || 'Upload failed'), 'error');
+                }
+            })
+            .catch(error => {
+                addResumeProgressItem('Error: ' + error.message, 'error');
+            })
+            .finally(() => {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Resume';
+            });
+        });
+
+        function addResumeProgressItem(message, type) {
+            const progressLog = document.getElementById('resumeProgressLog');
+            const item = document.createElement('div');
+            item.className = 'progress-item ' + type;
+            item.textContent = message;
+            progressLog.appendChild(item);
+        }
+
+        function downloadResume() {
+            window.location.href = '/download_resume';
+        }
+
+        function loadResumesList() {
+            fetch('/api/resumes_list')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('resumesTableBody');
+                    const resumes = data.resumes || [];
+                    const currentResume = data.current_resume;
+
+                    if (resumes.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="no-contacts">No resumes uploaded yet. Upload your first resume below!</td></tr>';
+                    } else {
+                        tbody.innerHTML = '';
+                        resumes.forEach(resume => {
+                            const row = document.createElement('tr');
+                            let dateStr = 'N/A';
+                            if (resume.upload_date) {
+                                try {
+                                    const date = new Date(resume.upload_date);
+                                    dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                } catch (e) {
+                                    dateStr = resume.upload_date.split('T')[0];
+                                }
+                            }
+
+                            const isCurrent = resume.stored_filename === currentResume;
+
+                            row.innerHTML = `
+                                <td>
+                                    <strong>${resume.original_name || 'N/A'}</strong>
+                                    ${isCurrent ? '<span style="color: var(--success); margin-left: 8px; font-size: 12px; font-weight: 600;">(Current)</span>' : ''}
+                                </td>
+                                <td style="color: var(--text-secondary);">${resume.file_size || 'N/A'}</td>
+                                <td style="color: var(--text-secondary);">${dateStr}</td>
+                                <td>
+                                    <div style="display: flex; gap: 8px;">
+                                        ${!isCurrent ? `<button onclick="setCurrentResume('${resume.stored_filename}')" class="btn btn-success" style="width: auto; padding: 6px 12px; font-size: 13px;">Set as Current</button>` : ''}
+                                        <button onclick="confirmDeleteResumeById('${resume.stored_filename}')" class="btn btn-danger" style="width: auto; padding: 6px 12px; font-size: 13px;">Delete</button>
+                                    </div>
+                                </td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
+
+                    document.getElementById('resumesCount').textContent = resumes.length + ' resume' + (resumes.length === 1 ? '' : 's');
+                })
+                .catch(error => {
+                    console.error('Error loading resumes list:', error);
+                    document.getElementById('resumesTableBody').innerHTML = '<tr><td colspan="4" class="no-contacts">Error loading resumes list</td></tr>';
+                });
+        }
+
+        function setCurrentResume(storedFilename) {
+            fetch('/api/set_current_resume', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ stored_filename: storedFilename })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    loadResumeStatus();
+                    loadResumesList();
+                    // Update the page to reflect new resume
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to set current resume'));
+                }
+            })
+            .catch(error => alert('Error: ' + error.message));
+        }
+
+        function confirmDeleteResumeById(storedFilename) {
+            if (confirm('Are you sure you want to delete this resume? This action cannot be undone.')) {
+                deleteResumeById(storedFilename);
+            }
+        }
+
+        function deleteResumeById(storedFilename) {
+            fetch('/api/delete_resume', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ stored_filename: storedFilename })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    loadResumeStatus();
+                    loadResumesList();
+                    // Update the page to reflect changes
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Delete failed'));
+                }
+            })
+            .catch(error => alert('Error: ' + error.message));
+        }
+
+        // Transcript management
+        function loadTranscriptStatus() {
+            fetch('/api/view_transcript')
+                .then(response => response.json())
+                .then(data => {
+                    const noTranscriptSection = document.getElementById('noTranscriptSection');
+                    const transcriptInfoSection = document.getElementById('transcriptInfoSection');
+
+                    if (data.has_transcript) {
+                        noTranscriptSection.style.display = 'none';
+                        transcriptInfoSection.style.display = 'block';
+                        document.getElementById('transcriptFilename').textContent = data.filename || 'Unknown';
+                        document.getElementById('transcriptFileSize').textContent = data.file_size || '';
+                    } else {
+                        noTranscriptSection.style.display = 'block';
+                        transcriptInfoSection.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading transcript status:', error);
+                });
+        }
+
+        document.getElementById('transcriptUploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const progressContainer = document.getElementById('transcriptProgressContainer');
+            const progressLog = document.getElementById('transcriptProgressLog');
+
+            const fileInput = document.getElementById('transcript');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a PDF file to upload');
+                return;
+            }
+
+            progressContainer.classList.add('active');
+            progressLog.innerHTML = '';
+
+            addTranscriptProgressItem('Uploading transcript...', 'in-progress');
+
+            fetch('/api/upload_transcript', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addTranscriptProgressItem('Transcript uploaded successfully!', 'success');
+                    fileInput.value = '';
+                    setTimeout(() => {
+                        loadTranscriptStatus();
+                        progressContainer.classList.remove('active');
+                        location.reload();
+                    }, 1500);
+                } else {
+                    addTranscriptProgressItem('Error: ' + (data.error || 'Upload failed'), 'error');
+                }
+            })
+            .catch(error => {
+                addTranscriptProgressItem('Error: ' + error.message, 'error');
+            });
+        });
+
+        function addTranscriptProgressItem(message, type) {
+            const progressLog = document.getElementById('transcriptProgressLog');
+            const item = document.createElement('div');
+            item.className = 'progress-item ' + type;
+            item.textContent = message;
+            progressLog.appendChild(item);
+        }
+
+        function deleteTranscript() {
+            if (!confirm('Are you sure you want to delete your transcript? This action cannot be undone.')) {
+                return;
+            }
+
+            fetch('/api/delete_transcript', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    loadTranscriptStatus();
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Delete failed'));
+                }
+            })
+            .catch(error => alert('Error: ' + error.message));
+        }
+
+        // Handshake DM functionality
+        let handshakeEventSource = null;
+        let currentHandshakeTaskId = null;
+
+        document.getElementById('handshakeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!userConfig.hasResume) {
+                alert('Please upload a resume in the Resume tab before starting a Handshake campaign');
+                return;
+            }
+
+            const city = document.getElementById('handshake_city').value.trim();
+            const numDms = document.getElementById('num_dms').value.trim();
+            const desiredJobField = document.getElementById('desired_job_field').value.trim();
+            const customMessage = document.getElementById('handshake_custom_message').value.trim();
+            const filterInternshipsOnly = document.getElementById('filter_internships_only').checked;
+
+            if (!city || !desiredJobField) {
+                alert('Please fill in city and target industry/field');
+                return;
+            }
+
+            document.getElementById('handshakeProgressContainer').classList.add('active');
+            document.getElementById('submitHandshakeBtn').disabled = true;
+            document.getElementById('submitHandshakeBtn').textContent = 'Running Campaign...';
+            document.getElementById('handshakeProgressLog').innerHTML = '';
+            document.getElementById('dmCount').textContent = '0 DMs sent';
+            document.getElementById('loginButtonContainer').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('city', city);
+            formData.append('num_dms', numDms);
+            formData.append('desired_job_field', desiredJobField);
+            formData.append('custom_message', customMessage);
+            formData.append('filter_internships_only', filterInternshipsOnly);
+
+            fetch('/submit_handshake', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+            .then(data => {
+                if (data.task_id) {
+                    currentHandshakeTaskId = data.task_id;
+                    startHandshakeProgressTracking(data.task_id);
+                }
+            })
+            .catch(error => {
+                addHandshakeProgressItem('Error: ' + error.message, 'error');
+                document.getElementById('submitHandshakeBtn').disabled = false;
+                document.getElementById('submitHandshakeBtn').textContent = 'Launch Handshake Campaign';
+            });
+        });
+
+        function startHandshakeProgressTracking(taskId) {
+            handshakeEventSource = new EventSource('/progress/' + taskId);
+
+            handshakeEventSource.addEventListener('message', function(e) {
+                const data = JSON.parse(e.data);
+                addHandshakeProgressItem(data.message, data.type || 'in-progress');
+
+                if (data.dm_count !== undefined) {
+                    document.getElementById('dmCount').textContent = data.dm_count + ' DMs sent';
+                }
+
+                // Check if this is a login-wait message
+                if (data.type === 'login-wait' && data.task_id) {
+                    document.getElementById('loginButtonContainer').style.display = 'block';
+                }
+
+                if (data.complete) {
+                    handshakeEventSource.close();
+                    document.getElementById('submitHandshakeBtn').disabled = false;
+                    document.getElementById('submitHandshakeBtn').textContent = 'Launch Handshake Campaign';
+                    document.getElementById('loginButtonContainer').style.display = 'none';
+                }
+            });
+
+            handshakeEventSource.addEventListener('error', function(e) {
+                console.error('EventSource error:', e);
+                handshakeEventSource.close();
+                document.getElementById('submitHandshakeBtn').disabled = false;
+                document.getElementById('submitHandshakeBtn').textContent = 'Launch Handshake Campaign';
+                document.getElementById('loginButtonContainer').style.display = 'none';
+            });
+        }
+
+        function addHandshakeProgressItem(message, type) {
+            const progressLog = document.getElementById('handshakeProgressLog');
+            const item = document.createElement('div');
+            item.className = 'progress-item ' + type;
+            item.textContent = message;
+            progressLog.appendChild(item);
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+
+        // Handle Handshake login confirmation
+        document.getElementById('confirmLoginBtn').addEventListener('click', function() {
+            if (!currentHandshakeTaskId) {
+                alert('No active Handshake campaign found');
+                return;
+            }
+
+            fetch('/confirm_handshake_login/' + currentHandshakeTaskId, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addHandshakeProgressItem('Login confirmed! Continuing campaign...', 'success');
+                    document.getElementById('loginButtonContainer').style.display = 'none';
+                } else {
+                    addHandshakeProgressItem('Error confirming login: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                addHandshakeProgressItem('Error: ' + error.message, 'error');
+            });
+        });
+
+        // Job Application functionality
+        let jobApplicationEventSource = null;
+        let currentJobApplicationTaskId = null;
+
+        document.getElementById('jobApplicationForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!userConfig.hasResume) {
+                alert('Please upload a resume in the Resume tab before starting a job application session');
+                return;
+            }
+
+            if (!userConfig.hasTranscript) {
+                alert('Transcript is required for job applications. Please upload your transcript in the Documents tab first.');
+                switchTab('resume'); // Switch to Documents tab to upload transcript
+                return;
+            }
+
+            const industry = document.getElementById('job_industry').value.trim();
+            const location = document.getElementById('job_location').value.trim();
+            const role = document.getElementById('job_role').value.trim();
+
+            if (!location || !role) {
+                alert('Please enter both location and role');
+                return;
+            }
+
+            document.getElementById('jobApplicationProgressContainer').classList.add('active');
+            document.getElementById('submitJobApplicationBtn').disabled = true;
+            document.getElementById('submitJobApplicationBtn').textContent = 'Starting Session...';
+            document.getElementById('jobApplicationProgressLog').innerHTML = '';
+            document.getElementById('jobApplicationLoginButtonContainer').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('industry', industry);
+            formData.append('location', location);
+            formData.append('role', role);
+
+            fetch('/submit_job_application', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+            .then(data => {
+                if (data.task_id) {
+                    currentJobApplicationTaskId = data.task_id;
+                    startJobApplicationProgressTracking(data.task_id);
+                } else if (data.error) {
+                    addJobApplicationProgressItem('Error: ' + data.error, 'error');
+                    document.getElementById('submitJobApplicationBtn').disabled = false;
+                    document.getElementById('submitJobApplicationBtn').textContent = 'Start Job Application Session';
+                }
+            })
+            .catch(error => {
+                addJobApplicationProgressItem('Error: ' + error.message, 'error');
+                document.getElementById('submitJobApplicationBtn').disabled = false;
+                document.getElementById('submitJobApplicationBtn').textContent = 'Start Job Application Session';
+            });
+        });
+
+        function startJobApplicationProgressTracking(taskId) {
+            jobApplicationEventSource = new EventSource('/progress/' + taskId);
+
+            jobApplicationEventSource.addEventListener('message', function(e) {
+                const data = JSON.parse(e.data);
+                addJobApplicationProgressItem(data.message, data.type || 'in-progress');
+
+                // Check if this is a login-wait message
+                if (data.type === 'login-wait' && data.task_id) {
+                    document.getElementById('jobApplicationLoginButtonContainer').style.display = 'block';
+                }
+
+                if (data.complete) {
+                    jobApplicationEventSource.close();
+                    document.getElementById('submitJobApplicationBtn').disabled = false;
+                    document.getElementById('submitJobApplicationBtn').textContent = 'Start Job Application Session';
+                    document.getElementById('jobApplicationLoginButtonContainer').style.display = 'none';
+                }
+            });
+
+            jobApplicationEventSource.addEventListener('error', function(e) {
+                console.error('EventSource error:', e);
+                jobApplicationEventSource.close();
+                document.getElementById('submitJobApplicationBtn').disabled = false;
+                document.getElementById('submitJobApplicationBtn').textContent = 'Start Job Application Session';
+                document.getElementById('jobApplicationLoginButtonContainer').style.display = 'none';
+            });
+        }
+
+        function addJobApplicationProgressItem(message, type) {
+            const progressLog = document.getElementById('jobApplicationProgressLog');
+            const item = document.createElement('div');
+            item.className = 'progress-item ' + type;
+            item.textContent = message;
+            progressLog.appendChild(item);
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+
+        // Handle Job Application login confirmation
+        document.getElementById('confirmJobApplicationLoginBtn').addEventListener('click', function() {
+            if (!currentJobApplicationTaskId) {
+                alert('No active job application session found');
+                return;
+            }
+
+            fetch('/confirm_handshake_login/' + currentJobApplicationTaskId, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addJobApplicationProgressItem('Login confirmed! Continuing session...', 'success');
+                    document.getElementById('jobApplicationLoginButtonContainer').style.display = 'none';
+                } else {
+                    addJobApplicationProgressItem('Error confirming login: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                addJobApplicationProgressItem('Error: ' + error.message, 'error');
+            });
+        });
+    </script>
+</body>
+</html>

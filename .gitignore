@@ -1,0 +1,18 @@
+.env
+instance/
+*.log
+*_log.json
+*.db
+*.db.backup*
+user_resumes/
+generated_resumes/
+generated_cover_letters/
+user_transcripts/
+uploads/
+setup.py
+__pycache__/
+*.pyc
+ManasviniKothariIBM.pdf
+05 Interleaving and Spaced Repitition.pdf
+Resume - Sumedh Kothari.pdf
+Sumedh_Kothari_Resume.pdf
