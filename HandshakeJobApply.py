@@ -850,7 +850,7 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                         time.sleep(2)
                         resume_input=self.driver.find_element(By.NAME,"file-Resume")
                         resume_input.send_keys(os.path.abspath(tailored_resume_path))
-                        time.sleep(5)
+                        time.sleep(10)
                         print(f'📎 Uploaded tailored resume')
                         if progress_callback:
                             progress_callback("Uploaded tailored resume", "info")
@@ -870,7 +870,7 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                                 transcript_path = os.path.join('user_transcripts', user.transcript_filename)
                                 if os.path.exists(transcript_path):
                                     transcript_input.send_keys(os.path.abspath(transcript_path))
-                                    time.sleep(5)
+                                    time.sleep(10)
                                     print(f'📎 Uploaded transcript')
                                     if progress_callback:
                                         progress_callback("Uploaded transcript", "info")
@@ -886,7 +886,7 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                         cover_letter_input = self.driver.find_element(By.NAME, "file-Cover Letter")
                         if cover_letter_path and os.path.exists(cover_letter_path):
                             cover_letter_input.send_keys(os.path.abspath(cover_letter_path))
-                            time.sleep(5)
+                            time.sleep(10)
                             print(f'📎 Uploaded cover letter')
                             if progress_callback:
                                 progress_callback("Uploaded cover letter", "info")
