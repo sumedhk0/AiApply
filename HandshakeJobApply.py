@@ -902,7 +902,18 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                         "//button[contains(text(), 'Submit Application')]")
                     self.driver.execute_script("arguments[0].scrollIntoView();", submit_button)
                     submit_button.click()
-                    time.sleep(3)  # Wait for submission
+                    time.sleep(5)  # Wait for submission
+
+                    try:
+                        xButton=self.driver.find_element(By.CSS_SELECTOR,"button[aria-label='Cancel application']")
+                        if xButton:
+                            xButton.click()
+                            time.sleep(2)
+                            print(f'Application unsuccessful')
+                            if progress_callback:
+                                progress_callback("Application submission failed", "error")
+                    except NoSuchElementException:
+                        pass
 
                     print(f'✅ Application submitted successfully!')
                     if progress_callback:
