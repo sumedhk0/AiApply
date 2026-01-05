@@ -2,7 +2,7 @@
 Handshake Direct Message Automation Module
 
 This module automates sending direct messages to hiring managers on Handshake.
-It uses Selenium WebDriver to:
+It uses Playwright for browser automation to:
 1. Log into Handshake with user credentials
 2. Navigate directly to employer pages matching desired city and industry
 3. Filter by location and industry
@@ -18,21 +18,11 @@ import re
 import json
 import urllib
 import requests
-import anthropic
 import pandas as pd
-import setup
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-from webdriver_manager.chrome import ChromeDriverManager
-
-api_key = setup.API_KEY
+from browser_utils import BrowserManager, find_element_with_fallback, scroll_to_bottom
+from llm_client import get_client
+from pdf_utils import extract_text_from_pdf
 
 # Official Handshake Industry Categories (from Handshake Help Center)
 HANDSHAKE_INDUSTRIES = {
@@ -126,85 +116,28 @@ class HandshakeAutomator:
             headless: Run browser in headless mode (default: False for debugging)
         """
         self.headless = headless
-        self.driver = None
-        self.wait = None
+        self.browser_manager = None
+        self.page = None
 
-        # Claude API configuration
-        self.claude_api_key = api_key
-        if not self.claude_api_key:
-            raise ValueError(
-                "API_KEY not set in setup.py. "
-                "Please set it with your Claude API key from https://console.anthropic.com/"
-            )
-
-        # Validate API key format
-        if not self.claude_api_key.startswith('sk-ant-'):
-            raise ValueError(
-                f"Invalid API key format. API keys should start with 'sk-ant-'. "
-                f"Please check your API key in setup.py"
-            )
-
-        try:
-            self.claude_client = anthropic.Anthropic(api_key=self.claude_api_key)
-        except Exception as e:
-            raise ValueError(
-                f"Failed to initialize Claude API client: {str(e)}. "
-                f"Please check your API key in setup.py"
-            )
+        # LLM client configuration (OpenRouter)
+        self.llm_client = get_client()
 
         # Company DM tracking log file
         self.dm_log_file = os.path.join(os.path.dirname(__file__), "handshake_dm_log.json")
 
     def setup_driver(self):
-        """Set up Chrome WebDriver with appropriate options."""
-        chrome_options = Options()
-
-        if self.headless:
-            chrome_options.add_argument('--headless=new')
-
-        # Stability and compatibility options
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-software-rasterizer')
-        chrome_options.add_argument('--window-size=1920,1080')
-        chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
-
-        # Disable automation flags
-        chrome_options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-
-        # Add error logging
-        chrome_options.add_argument('--enable-logging')
-        chrome_options.add_argument('--v=1')
-
+        """Set up Playwright browser with appropriate options."""
         try:
-            driver_path = ChromeDriverManager().install()
-            print(f"Using ChromeDriver at: {driver_path}")
-
-            self.driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
-
-            capabilities = self.driver.capabilities
-            print(f"Chrome version: {capabilities.get('browserVersion', 'Unknown')}")
-            print(f"ChromeDriver version: {capabilities.get('chrome', {}).get('chromedriverVersion', 'Unknown')}")
-
-            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                'source': '''
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    })
-                '''
-            })
-
-            self.wait = WebDriverWait(self.driver, 20)
+            self.browser_manager = BrowserManager(headless=self.headless)
+            self.page = self.browser_manager.setup()
+            print(f"Playwright browser initialized successfully")
 
         except Exception as e:
-            print(f"Error setting up ChromeDriver: {str(e)}")
+            print(f"Error setting up Playwright browser: {str(e)}")
             print("Troubleshooting tips:")
-            print("1. Make sure Chrome browser is installed and up to date")
-            print("2. Try running: pip install --upgrade selenium webdriver-manager")
-            print("3. Close any existing Chrome instances")
+            print("1. Run: pip install playwright")
+            print("2. Run: playwright install chromium")
+            print("3. Close any existing browser instances")
             raise
 
     def load_contacted_companies(self):
@@ -255,7 +188,7 @@ class HandshakeAutomator:
 
     def login_to_handshake(self, progress_callback=None, login_confirmed_callback=None):
         """
-        Log into Handshake using provided credentials.
+        Log into Handshake using manual login.
         Handles case where user is already logged in from previous session.
 
         Args:
@@ -269,8 +202,8 @@ class HandshakeAutomator:
             if progress_callback:
                 progress_callback("Navigating to Handshake login page...", "in-progress")
 
-            self.driver.get("https://app.joinhandshake.com/login")
-            time.sleep(3)
+            self.page.goto("https://app.joinhandshake.com/login")
+            self.page.wait_for_timeout(3000)
 
             if progress_callback:
                 progress_callback("Please log into Handshake in the browser window, then click 'I'm Logged In' button below.", "login-wait")
@@ -298,23 +231,20 @@ class HandshakeAutomator:
                     progress_callback("Login timeout - please try again and click the button after logging in", "error")
                 return False
 
-            # Verify login by checking for job search page
+            # Verify login by checking for employers page
             try:
-                self.driver.get("https://app.joinhandshake.com/employers")
-                
-                time.sleep(3)
+                self.page.goto("https://app.joinhandshake.com/employers")
+                self.page.wait_for_timeout(3000)
 
-                # Check if we're on the jobs page
-                self.wait.until(
-                    EC.presence_of_element_located((By.XPATH, "./*"))
-                )
+                # Check if we're on the employers page
+                self.page.wait_for_selector("body", timeout=20000)
 
                 if progress_callback:
                     progress_callback("Successfully logged into Handshake!", "success")
-                
+
                 return True
 
-            except TimeoutException:
+            except Exception:
                 if progress_callback:
                     progress_callback("Login verification failed. Please ensure you're logged in.", "error")
                 return False
@@ -404,23 +334,12 @@ Return your answer as a JSON array of industry names EXACTLY as they appear in t
 Return ONLY the JSON array with no markdown formatting, nothing else. You must include at least 1 industry."""
 
             try:
-                response = self.claude_client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
-                    max_tokens=300,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-            except anthropic.AuthenticationError as auth_error:
-                print(f"❌ Claude API authentication failed: {str(auth_error)}")
-                print(f"Your API key in setup.py may be invalid or expired.")
-                print(f"Falling back to keyword matching...")
-                raise Exception(f"API authentication error: {str(auth_error)}")
+                response_text = self.llm_client.create_message(prompt, max_tokens=300)
+                response_text = response_text.strip()
             except Exception as api_error:
-                print(f"❌ Claude API error: {str(api_error)}")
+                print(f"❌ LLM API error: {str(api_error)}")
                 print(f"Falling back to keyword matching...")
                 raise Exception(f"API error: {str(api_error)}")
-
-            # Parse the response
-            response_text = response.content[0].text.strip()
 
             # Remove markdown code blocks if present
             if response_text.startswith("```"):
@@ -565,25 +484,13 @@ For example:
 Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown, just the string "lat,long"."""
 
             try:
-                response = self.claude_client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
-                    max_tokens=100,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-            except anthropic.AuthenticationError as auth_error:
-                raise ValueError(
-                    f"Claude API authentication failed: {str(auth_error)}\n"
-                    f"Your API key in setup.py may be invalid or expired.\n"
-                    f"Please get a new API key from https://console.anthropic.com/"
-                )
+                coordinates = self.llm_client.create_message(prompt, max_tokens=100)
+                coordinates = coordinates.strip()
             except Exception as api_error:
                 raise ValueError(
-                    f"Claude API error: {str(api_error)}\n"
+                    f"LLM API error: {str(api_error)}\n"
                     f"Please check your API key and internet connection."
                 )
-
-            # Parse the response - should be just the coordinates string
-            coordinates = response.content[0].text.strip()
 
             # Remove quotes if AI added them
             coordinates = coordinates.replace('"', '').replace("'", "")
@@ -618,51 +525,29 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
 
     
 
-    def extract_employer_urls(self,progress_callback=None):
-        time.sleep(5)
+    def extract_employer_urls(self, progress_callback=None):
+        self.page.wait_for_timeout(5000)
 
         # Scroll through the page to load all employer cards
         if progress_callback:
             progress_callback("Scrolling through page to load all employers...", "in-progress")
 
-        last_height = self.driver.execute_script("return document.body.scrollHeight")
-        scroll_attempts = 0
-        max_scroll_attempts = 10  # Prevent infinite scrolling
-
-        while scroll_attempts < max_scroll_attempts:
-            # Scroll down to bottom
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)  # Wait for page to load
-
-            # Calculate new scroll height and compare with last scroll height
-            new_height = self.driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height:
-                # If heights are the same, we've reached the bottom
-                break
-            last_height = new_height
-            scroll_attempts += 1
-
-            if progress_callback:
-                progress_callback(f"Loading more employers... (scroll {scroll_attempts}/{max_scroll_attempts})", "in-progress")
-
-        # Scroll back to top to ensure all elements are accessible
-        self.driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(1)
+        scroll_to_bottom(self.page, max_scrolls=10, wait_time=2000)
 
         # Now extract all employer links
-        all_links=self.driver.find_elements(By.TAG_NAME,'a')
-        employer_urls=[]
-        employer_names=[]
+        all_links = self.page.locator('a').all()
+        employer_urls = []
+        employer_names = []
         for link in all_links:
-            href=link.get_attribute('href')
+            href = link.get_attribute('href')
             if href and '/e/' in href:
                 employer_urls.append(href)
-                employer_names.append(link.text.strip())
+                employer_names.append(link.text_content() or "")
 
         if progress_callback:
             progress_callback(f"Extracted {len(employer_urls)} employer URLs", "success")
 
-        return employer_urls,employer_names
+        return employer_urls, employer_names
     
     def clean_company_name(self, raw_company_name):
         """
@@ -687,21 +572,21 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
         # Return cleaned name or fallback
         return clean_name if clean_name else "Unknown Company"
 
-    def find_recruiter_name(self,progress_callback=None):
+    def find_recruiter_name(self, progress_callback=None):
         """
         Extract recruiter's name from their Handshake profile page.
 
         Returns:
             str: Recruiter's name, or None if not found
         """
-        all_names=self.driver.find_elements(By.TAG_NAME,'h1')
-        person_name=[]
+        all_names = self.page.locator('h1').all()
         for name in all_names:
-            val=name.text.strip()
+            val = name.text_content() or ""
+            val = val.strip()
             if "Message" in val:
                 # Extract name after "Message" text
                 # Example: "Message Dr. Alice Wonderland" -> "Dr. Alice Wonderland"
-                recruiter_name = val.split("Message",1)[1].strip()
+                recruiter_name = val.split("Message", 1)[1].strip()
 
                 # If the name has newlines (e.g., "Dr. Alice Wonderland\nDoctor of Research"),
                 # take only the first line (the actual name)
@@ -723,39 +608,37 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
         """
         try:
             # Strategy 1: Look for h2 elements that might contain job title
-            all_h2 = self.driver.find_elements(By.TAG_NAME, 'h2')
+            all_h2 = self.page.locator('h2').all()
             for h2 in all_h2:
-                text = h2.text.strip()
+                text = (h2.text_content() or "").strip()
                 # Filter out common non-title headers
                 if text and text not in ['Message', 'About', 'Education', 'Experience', 'Skills']:
                     # This might be the job title
                     if len(text) < 100:  # Reasonable length for a job title
                         return text
 
-            # Strategy 2: Look for elements with specific classes (may vary based on Handshake's HTML)
-            # Try common job title selectors
+            # Strategy 2: Look for elements with specific classes
             job_title_selectors = [
-                (By.CSS_SELECTOR, '[class*="job-title"]'),
-                (By.CSS_SELECTOR, '[class*="title"]'),
-                (By.CSS_SELECTOR, '[class*="position"]'),
-                (By.XPATH, '//div[contains(@class, "profile")]//p[1]'),
+                '[class*="job-title"]',
+                '[class*="title"]',
+                '[class*="position"]',
+                'div[class*="profile"] p:first-child',
             ]
 
-            for by_method, selector in job_title_selectors:
+            for selector in job_title_selectors:
                 try:
-                    elements = self.driver.find_elements(by_method, selector)
+                    elements = self.page.locator(selector).all()
                     for elem in elements:
-                        text = elem.text.strip()
+                        text = (elem.text_content() or "").strip()
                         if text and len(text) < 100 and '\n' not in text:
                             return text
                 except:
                     continue
 
             # Strategy 3: Extract from recruiter name element if it contains title
-            # Example: "Dr. Alice Wonderland\nDoctor of Research, Research Labs"
-            all_names = self.driver.find_elements(By.TAG_NAME, 'h1')
+            all_names = self.page.locator('h1').all()
             for name in all_names:
-                val = name.text.strip()
+                val = (name.text_content() or "").strip()
                 if "Message" in val:
                     # Remove "Message" prefix
                     remaining_text = val.split("Message", 1)[1].strip()
@@ -763,7 +646,6 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                     if '\n' in remaining_text:
                         lines = remaining_text.split('\n')
                         if len(lines) > 1:
-                            # Second line might be "Doctor of Research, Research Labs"
                             potential_title = lines[1].strip()
                             if potential_title:
                                 return potential_title
@@ -778,48 +660,24 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
 
     def find_recruiter_url(self):
         print('reached find recruiter url')
-        time.sleep(5)
+        self.page.wait_for_timeout(5000)
 
         # Scroll through the page to ensure all recruiter profiles are loaded
-        last_height = self.driver.execute_script("return document.body.scrollHeight")
-        scroll_attempts = 0
-        max_scroll_attempts = 5  # Employer pages are usually shorter
-
-        while scroll_attempts < max_scroll_attempts:
-            # Scroll down to bottom
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(1.5)  # Wait for content to load
-
-            # Calculate new scroll height and compare with last scroll height
-            new_height = self.driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height:
-                # If heights are the same, we've reached the bottom
-                break
-            last_height = new_height
-            scroll_attempts += 1
-
-        # Scroll back to top to ensure all elements are accessible
-        self.driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(1)
+        scroll_to_bottom(self.page, max_scrolls=5, wait_time=1500)
 
         # Now extract all recruiter profile links
-        all_links=self.driver.find_elements(By.TAG_NAME,'a')
-        person_links=[]
-        person_name=[]
-        time.sleep(2)
+        all_links = self.page.locator('a').all()
+        person_links = []
+        person_name = []
+        self.page.wait_for_timeout(2000)
         for link in all_links:
-            #print(link.text)
-            href=link.get_attribute('href')
+            href = link.get_attribute('href')
             if href and '/profiles/' in href:
                 person_links.append(href)
-                person_name.append(link.text.strip())
-        if len(person_name)>=2 & len(person_links)>=2:
-            #print(person_name[1])
-            #print(person_links[1])
-            #print('reached end of find recruiter url: returned tuple')
-            return person_links[1],person_name[1]
+                person_name.append((link.text_content() or "").strip())
+        if len(person_name) >= 2 and len(person_links) >= 2:
+            return person_links[1], person_name[1]
         else:
-            #print('reached end of find recruiter url: returned nothing')
             return False
     
     
@@ -855,13 +713,13 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                     progress_callback(f"Skipped '{company_name}' (already contacted)", "info")
                 continue
 
-            self.driver.get(employer_urls[i])
-            time.sleep(3)
+            self.page.goto(employer_urls[i])
+            self.page.wait_for_timeout(3000)
             if(self.find_recruiter_url()):
-                recruiter_url,recruiter_name=self.find_recruiter_url()
+                recruiter_url, recruiter_name = self.find_recruiter_url()
                 if recruiter_url:
-                    self.driver.get(recruiter_url)
-                    time.sleep(3)
+                    self.page.goto(recruiter_url)
+                    self.page.wait_for_timeout(3000)
 
                     # Extract recruiter name
                     nombre=self.find_recruiter_name(progress_callback)
@@ -928,29 +786,19 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
             if progress_callback:
                 progress_callback("Opening message composer...", "in-progress")
 
-            time.sleep(3)
+            self.page.wait_for_timeout(3000)
 
-            # Find and click the Message button
+            # Find and click the Message button using Playwright selectors
             message_button_selectors = [
-                "//button[contains(text(), 'Message')]",
-                "//button[text()='Message']",
-                "//button[@aria-label='Message']",
-                "//a[contains(text(), 'Message')]",
-                "//button[contains(@class, 'message')]",
-                "//*[contains(text(), 'Message') and (self::button or self::a)]"
+                "button:has-text('Message')",
+                "button[aria-label='Message']",
+                "a:has-text('Message')",
+                "button[class*='message']",
+                "xpath=//button[contains(text(), 'Message')]",
+                "xpath=//*[contains(text(), 'Message') and (self::button or self::a)]"
             ]
 
-            message_button = None
-            for selector in message_button_selectors:
-                try:
-                    message_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, selector))
-                    )
-                    if message_button:
-                        print(f"✓ Found message button using selector: {selector}")
-                        break
-                except:
-                    continue
+            message_button = find_element_with_fallback(self.page, message_button_selectors, timeout=5000)
 
             if not message_button:
                 if progress_callback:
@@ -960,89 +808,62 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
             # Click the message button
             message_button.click()
             print("✓ Clicked message button")
-            time.sleep(3)  # Give time for messaging interface to load
+            self.page.wait_for_timeout(3000)  # Give time for messaging interface to load
 
             # Wait for the message composer to be fully loaded
-            # Check if we're now in a messaging interface (modal or separate page)
             if progress_callback:
                 progress_callback("Waiting for message composer to load...", "in-progress")
 
             # Try multiple strategies to find the message input
-            message_box = None
             message_box_selectors = [
-                (By.TAG_NAME, 'textarea'),
-                (By.CSS_SELECTOR, 'textarea[placeholder*="message" i]'),
-                (By.CSS_SELECTOR, 'textarea[placeholder*="Message" i]'),
-                (By.CSS_SELECTOR, 'textarea[aria-label*="message" i]'),
-                (By.CSS_SELECTOR, 'div[contenteditable="true"]'),  # Rich text editor
-                (By.XPATH, '//textarea[contains(@placeholder, "Type")]'),
-                (By.XPATH, '//div[@role="textbox"]')
+                "textarea",
+                "textarea[placeholder*='message' i]",
+                "textarea[placeholder*='Message' i]",
+                "textarea[aria-label*='message' i]",
+                "div[contenteditable='true']",
+                "div[role='textbox']",
+                "xpath=//textarea[contains(@placeholder, 'Type')]"
             ]
 
-            for by_method, selector in message_box_selectors:
-                try:
-                    message_box = WebDriverWait(self.driver, 10).until(
-                        EC.presence_of_element_located((by_method, selector))
-                    )
-                    if message_box:
-                        # Verify it's visible and interactable
-                        if message_box.is_displayed():
-                            print(f"✓ Found message input using: {by_method} - {selector}")
-                            break
-                        else:
-                            message_box = None
-                except:
-                    continue
+            message_box = find_element_with_fallback(self.page, message_box_selectors, timeout=10000)
 
             if not message_box:
                 if progress_callback:
                     progress_callback("Message input box not found in messaging interface.", "error")
                 return False
 
+            print(f"✓ Found message input")
+
             # Clear any existing text and enter the message
             if progress_callback:
                 progress_callback("Composing message...", "in-progress")
 
-            try:
-                message_box.clear()
-            except:
-                # Some elements don't support clear(), try selecting all and deleting
-                message_box.send_keys(Keys.CONTROL + "a")
-                message_box.send_keys(Keys.DELETE)
-
             message_box.click()  # Ensure it's focused
-            time.sleep(0.5)
-            message_box.send_keys(message_text)
+            self.page.wait_for_timeout(500)
+
+            # Clear existing text
+            message_box.press("Control+a")
+            message_box.press("Delete")
+
+            # Type the message
+            message_box.fill(message_text)
             print(f"✓ Entered message text ({len(message_text)} characters)")
-            time.sleep(1.5)  # Wait for text to fully populate
+            self.page.wait_for_timeout(1500)  # Wait for text to fully populate
 
             # Find and click the Send button
             if progress_callback:
                 progress_callback("Sending message...", "in-progress")
 
             send_button_selectors = [
-                "//button[contains(text(), 'Send')]",
-                "//button[text()='Send']",
-                "//button[@type='submit' and contains(., 'Send')]",
-                "//button[contains(@aria-label, 'Send')]",
-                "//button[contains(@aria-label, 'send')]",
-                "//*[contains(text(), 'Send') and self::button]",
-                "//button[@type='submit']"  # Generic submit button
+                "button:has-text('Send')",
+                "button[type='submit']:has-text('Send')",
+                "button[aria-label*='Send']",
+                "button[aria-label*='send']",
+                "button[type='submit']",
+                "xpath=//button[contains(text(), 'Send')]"
             ]
 
-            send_button = None
-            for selector in send_button_selectors:
-                try:
-                    send_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, selector))
-                    )
-                    if send_button and send_button.is_displayed() and send_button.is_enabled():
-                        print(f"✓ Found send button using selector: {selector}")
-                        break
-                    else:
-                        send_button = None
-                except:
-                    continue
+            send_button = find_element_with_fallback(self.page, send_button_selectors, timeout=5000)
 
             if not send_button:
                 if progress_callback:
@@ -1052,16 +873,17 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
             # Click the send button
             send_button.click()
             print("✓ Clicked send button")
-            time.sleep(2)
+            self.page.wait_for_timeout(2000)
 
-            # Verify the message was sent by checking if:
-            # 1. The textarea is cleared/empty
-            # 2. The send button is disabled or no longer visible
-            # 3. No error messages appeared
+            # Verify the message was sent
             try:
-                # Check if message box is cleared (indicates successful send)
-                time.sleep(1)
-                current_text = message_box.get_attribute('value') or message_box.text
+                self.page.wait_for_timeout(1000)
+                # Try to get current text in message box
+                try:
+                    current_text = message_box.input_value() if message_box.is_visible() else ""
+                except:
+                    current_text = ""
+
                 if len(current_text.strip()) == 0:
                     print("✓ Message box cleared - message sent successfully")
                     if progress_callback:
@@ -1069,23 +891,15 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                     return True
                 else:
                     print(f"⚠ Message box still contains text: {current_text[:50]}...")
-                    # Don't fail immediately - message might still have been sent
                     if progress_callback:
                         progress_callback("Message sent (verification unclear)", "success")
                     return True
             except:
-                # If we can't verify, assume success since no error was thrown
                 print("✓ Message sent (could not verify, but no errors)")
                 if progress_callback:
                     progress_callback("Direct message sent successfully!", "success")
                 return True
 
-        except TimeoutException as e:
-            error_msg = f"Timeout while sending DM: {str(e)}"
-            print(f"✗ {error_msg}")
-            if progress_callback:
-                progress_callback(error_msg, "error")
-            return False
         except Exception as e:
             error_msg = f"Error sending DM: {str(e)}"
             print(f"✗ {error_msg}")
@@ -1125,10 +939,19 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
         try:
             greeting = f"Hi {recruiter_name}" if recruiter_name else "Hello"
 
+            # Extract text from resume PDF
+            resume_text = extract_text_from_pdf(user_resume_path)
+            if not resume_text:
+                print(f"⚠️ Could not extract text from resume, using fallback message")
+                raise ValueError("Could not extract resume text")
+
             prompt = f"""You are helping a student write a personalized, professional direct message to a hiring manager on Handshake.
 
 Company: {company_name}
 Hiring Manager: {recruiter_name or 'Unknown'}. Only use their full name or title (such as Dr.). So for example if the entry was 'Dr. Alice Wonderland\nDoctor of Research, Research Labs' you should only use 'Dr. Alice Wonderland' or 'Dr. Wonderland'.
+
+RESUME CONTENT:
+{resume_text}
 
 Write a short, professional direct message (3-4 sentences max) that:
 1. Expresses genuine interest in opportunities at {company_name}
@@ -1141,43 +964,20 @@ Write a short, professional direct message (3-4 sentences max) that:
 Return ONLY the message body (no subject line, greeting, or signature). Start directly with the content.
 Do not include placeholders like [Your Name] - the message should be ready to send as-is."""
 
-            content = [{"type": "text", "text": prompt}]
-
-            # Load and attach resume (now mandatory)
-            with open(user_resume_path, 'rb') as f:
-                resume_data = f.read()
-                import base64
-                resume_base64 = base64.b64encode(resume_data).decode('utf-8')
-
-                content.append({
-                    "type": "document",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "application/pdf",
-                        "data": resume_base64
-                    }
-                })
-
             try:
-                response = self.claude_client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
-                    max_tokens=500,
-                    messages=[{"role": "user", "content": content}]
-                )
-
-                message_body = response.content[0].text.strip()
+                message_body = self.llm_client.create_message(prompt, max_tokens=500)
+                message_body = message_body.strip()
                 full_message = f"{greeting},\n\n{message_body}\n\nBest regards"
 
                 return full_message
 
-            except anthropic.AuthenticationError as auth_error:
-                print(f"❌ Claude API authentication failed: {str(auth_error)}")
-                print(f"Your API key in setup.py may be invalid or expired.")
+            except Exception as api_error:
+                print(f"❌ LLM API error: {str(api_error)}")
                 print(f"Using fallback message template...")
-                raise Exception(f"API authentication error: {str(auth_error)}")
+                raise Exception(f"API error: {str(api_error)}")
 
         except Exception as e:
-            print(f"Claude API error: {str(e)}")
+            print(f"LLM API error: {str(e)}")
             # Fallback to simple template
             return f"""{greeting},
 
@@ -1298,10 +1098,10 @@ Best regards"""
             if progress_callback:
                 progress_callback(f"Navigating to employer search page with filters...", "in-progress")
 
-            self.driver.get(filter_url)
+            self.page.goto(filter_url)
 
             # Wait for the page to load completely
-            time.sleep(5)
+            self.page.wait_for_timeout(5000)
 
             if progress_callback:
                 progress_callback("Employer search page loaded. Extracting employer information...", "in-progress")
@@ -1325,11 +1125,11 @@ Best regards"""
                 progress_callback(error_msg, "error")
 
         finally:
-            if self.driver is not None:
+            if self.browser_manager is not None:
                 try:
                     print("\nClosing browser in 10 seconds...")
                     time.sleep(10)
-                    self.driver.quit()
+                    self.browser_manager.close()
                     print("Browser closed successfully.")
                 except Exception as e:
                     print(f"Warning: Error closing browser: {str(e)}")

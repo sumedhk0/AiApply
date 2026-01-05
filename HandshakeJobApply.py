@@ -2,7 +2,7 @@
 Handshake Job Application Automation Module
 
 This module automates applying to jobs on Handshake.
-It uses Selenium WebDriver to:
+It uses Playwright for browser automation to:
 1. Log into Handshake with user credentials
 2. Navigate to job listings matching desired criteria
 3. Apply to relevant positions
@@ -14,24 +14,13 @@ import time
 import json
 import urllib
 import pandas as pd
-import anthropic
-import setup
 import ResumeGenerator
 import CoverLetterGenerator
 from PyPDF2 import PdfReader
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from webdriver_manager.chrome import ChromeDriverManager
-
-api_key = setup.API_KEY
+from browser_utils import BrowserManager, find_element_with_fallback, scroll_to_bottom
+from llm_client import get_client
+from pdf_utils import extract_text_from_pdf
 
 
 class HandshakeJobApplicator:
@@ -49,87 +38,30 @@ class HandshakeJobApplicator:
             user_id: User ID for database tracking
         """
         self.headless = headless
-        self.driver = None
-        self.wait = None
+        self.browser_manager = None
+        self.page = None
         self.resume_path = resume_path
         self.user_id = user_id
 
-        # Claude API configuration
-        self.claude_api_key = api_key
-        if not self.claude_api_key:
-            raise ValueError(
-                "API_KEY not set in setup.py. "
-                "Please set it with your Claude API key from https://console.anthropic.com/"
-            )
-
-        # Validate API key format
-        if not self.claude_api_key.startswith('sk-ant-'):
-            raise ValueError(
-                f"Invalid API key format. API keys should start with 'sk-ant-'. "
-                f"Please check your API key in setup.py"
-            )
-
-        try:
-            self.claude_client = anthropic.Anthropic(api_key=self.claude_api_key)
-        except Exception as e:
-            raise ValueError(
-                f"Failed to initialize Claude API client: {str(e)}. "
-                f"Please check your API key in setup.py"
-            )
+        # LLM client configuration (OpenRouter)
+        self.llm_client = get_client()
 
         # Job application tracking log file
         self.application_log_file = os.path.join(os.path.dirname(__file__), "handshake_applications_log.json")
 
     def setup_driver(self):
-        """Set up Chrome WebDriver with appropriate options."""
-        chrome_options = Options()
-
-        if self.headless:
-            chrome_options.add_argument('--headless=new')
-
-        # Stability and compatibility options
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-software-rasterizer')
-        chrome_options.add_argument('--window-size=1920,1080')
-        chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
-
-        # Disable automation flags
-        chrome_options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-
-        # Add error logging
-        chrome_options.add_argument('--enable-logging')
-        chrome_options.add_argument('--v=1')
-
+        """Set up Playwright browser with appropriate options."""
         try:
-            driver_path = ChromeDriverManager().install()
-            print(f"Using ChromeDriver at: {driver_path}")
-
-            self.driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
-
-            capabilities = self.driver.capabilities
-            print(f"Chrome version: {capabilities.get('browserVersion', 'Unknown')}")
-            print(f"ChromeDriver version: {capabilities.get('chrome', {}).get('chromedriverVersion', 'Unknown')}")
-
-            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                'source': '''
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    })
-                '''
-            })
-
-            self.wait = WebDriverWait(self.driver, 20)
+            self.browser_manager = BrowserManager(headless=self.headless)
+            self.page = self.browser_manager.setup()
+            print(f"Playwright browser initialized successfully")
 
         except Exception as e:
-            print(f"Error setting up ChromeDriver: {str(e)}")
+            print(f"Error setting up Playwright browser: {str(e)}")
             print("Troubleshooting tips:")
-            print("1. Make sure Chrome browser is installed and up to date")
-            print("2. Try running: pip install --upgrade selenium webdriver-manager")
-            print("3. Close any existing Chrome instances")
+            print("1. Run: pip install playwright")
+            print("2. Run: playwright install chromium")
+            print("3. Close any existing browser instances")
             raise
 
     def load_applied_jobs(self):
@@ -205,9 +137,8 @@ class HandshakeJobApplicator:
             if progress_callback:
                 progress_callback("Navigating to Handshake login page...", "in-progress")
 
-            self.driver.get("https://app.joinhandshake.com/login")
-            self.driver.fullscreen_window()
-            time.sleep(3)
+            self.page.goto("https://app.joinhandshake.com/login")
+            self.page.wait_for_timeout(3000)
 
             if progress_callback:
                 progress_callback("Please log into Handshake in the browser window, then click 'I'm Logged In' button below.", "login-wait")
@@ -237,21 +168,18 @@ class HandshakeJobApplicator:
 
             # Verify login by checking for jobs page
             try:
-                self.driver.get("https://app.joinhandshake.com/stu/postings")
-                self.driver.fullscreen_window()
-                time.sleep(3)
+                self.page.goto("https://app.joinhandshake.com/stu/postings")
+                self.page.wait_for_timeout(3000)
 
                 # Check if we're on the jobs page
-                self.wait.until(
-                    EC.presence_of_element_located((By.XPATH, "./*"))
-                )
+                self.page.wait_for_selector("body", timeout=20000)
 
                 if progress_callback:
                     progress_callback("Successfully logged into Handshake!", "success")
 
                 return True
 
-            except TimeoutException:
+            except Exception:
                 if progress_callback:
                     progress_callback("Login verification failed. Please ensure you're logged in.", "error")
                 return False
@@ -327,20 +255,11 @@ Return your answer as a JSON array of industry names EXACTLY as they appear in t
 Return ONLY the JSON array with no markdown formatting, nothing else. You must include at least 1 industry."""
 
             try:
-                response = self.claude_client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
-                    max_tokens=300,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-            except anthropic.AuthenticationError as auth_error:
-                print(f"❌ Claude API authentication failed: {str(auth_error)}")
-                raise Exception(f"API authentication error: {str(auth_error)}")
+                response_text = self.llm_client.create_message(prompt, max_tokens=300)
+                response_text = response_text.strip()
             except Exception as api_error:
-                print(f"❌ Claude API error: {str(api_error)}")
+                print(f"❌ LLM API error: {str(api_error)}")
                 raise Exception(f"API error: {str(api_error)}")
-
-            # Parse the response
-            response_text = response.content[0].text.strip()
 
             # Remove markdown code blocks if present
             if response_text.startswith("```"):
@@ -417,24 +336,13 @@ For example:
 Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown, just the string "lat,long"."""
 
             try:
-                response = self.claude_client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
-                    max_tokens=100,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-            except anthropic.AuthenticationError as auth_error:
-                raise ValueError(
-                    f"Claude API authentication failed: {str(auth_error)}\n"
-                    f"Your API key in setup.py may be invalid or expired."
-                )
+                coordinates = self.llm_client.create_message(prompt, max_tokens=100)
+                coordinates = coordinates.strip()
             except Exception as api_error:
                 raise ValueError(
-                    f"Claude API error: {str(api_error)}\n"
+                    f"LLM API error: {str(api_error)}\n"
                     f"Please check your API key and internet connection."
                 )
-
-            # Parse the response - should be just the coordinates string
-            coordinates = response.content[0].text.strip()
 
             # Remove quotes if AI added them
             coordinates = coordinates.replace('"', '').replace("'", "")
@@ -557,24 +465,22 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                     progress_callback(f"Navigating to filtered jobs (Industry: {industry}, Location: {location}" +
                                       (f", Role: {role}" if role else "") + ")...", "in-progress")
 
-                self.driver.get(filter_url)
-                self.driver.fullscreen_window()
-                time.sleep(5)
-                currUrl=self.driver.current_url
+                self.page.goto(filter_url)
+                self.page.wait_for_timeout(5000)
+                currUrl = self.page.url
                 if industry:
                     for code in industry_codes:
-                        currUrl+= f'&industries={code}'
+                        currUrl += f'&industries={code}'
 
-                currUrl=currUrl + '&jobType=3'
-                self.driver.get(currUrl)
-                self.driver.fullscreen_window()
-                time.sleep(3)
+                currUrl = currUrl + '&jobType=3'
+                self.page.goto(currUrl)
+                self.page.wait_for_timeout(3000)
                 if(role):
-                    jobTypeField = self.driver.find_element(By.XPATH, "//input[@placeholder='Search jobs']")
-                    jobTypeField.clear()
-                    jobTypeField.send_keys(role)
-                    jobTypeField.send_keys(Keys.ENTER)
-                    time.sleep(4)
+                    jobTypeField = self.page.locator("input[placeholder='Search jobs']")
+                    jobTypeField.fill("")
+                    jobTypeField.fill(role)
+                    jobTypeField.press("Enter")
+                    self.page.wait_for_timeout(4000)
 
                 
                 results["message"] = f"Successfully navigated to filtered jobs page. Filters applied - Industry: {industry}, Location: {location}" + (f", Role: {role}" if role else "")
@@ -588,41 +494,42 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                     progress_callback("Login successful! Ready for job applications (functionality coming soon).", "success")
 
                 
-            print('reached applying to selected jobs')    
-            time.sleep(3)
-            jobsHook = self.driver.find_element(By.CSS_SELECTOR, "[aria-label='Jobs List']")
-            jobsHookElements=jobsHook.find_elements(By.XPATH,"./*")
-            clickableJobLinks=jobsHookElements[2]
-            
-            iterativeJobLinks=clickableJobLinks.find_elements(By.XPATH,"./*")
-            #print(f"Found {len(clickableJobLinks)} elements to click")
-            for index, element in enumerate(iterativeJobLinks):
-                try:
-                    print(f"Index Value: {index}")
-                    jobsHook = self.driver.find_element(By.CSS_SELECTOR, "[aria-label='Jobs List']")
-                    jobsHookElements=jobsHook.find_elements(By.XPATH,"./*")
-                    clickableJobLinks=jobsHookElements[2]
-                    iterativeJobLinks=clickableJobLinks.find_elements(By.XPATH,"./*")
-                    currentJob=iterativeJobLinks[index]
-                    
-                    self.driver.execute_script("arguments[0].scrollIntoView();", currentJob)
-                    currentJob=iterativeJobLinks[index]
-                    print(f"Clicking element {index + 1}...")
-                    print(currentJob.text)
-                    currentJob.click()
-                    
-                    jobName=currentJob.text.split('\n')[0]
-                    
-                    time.sleep(1)
-                    value=self.applyToSelectedJob(jobName,progress_callback)
-                    if not value:
+            print('reached applying to selected jobs')
+            self.page.wait_for_timeout(3000)
+            jobsHook = self.page.locator("[aria-label='Jobs List']")
+            jobsHookElements = jobsHook.locator("> *").all()
+            if len(jobsHookElements) > 2:
+                clickableJobLinks = jobsHookElements[2]
+                iterativeJobLinks = clickableJobLinks.locator("> *").all()
+
+                for index, element in enumerate(iterativeJobLinks):
+                    try:
+                        print(f"Index Value: {index}")
+                        # Re-fetch elements to avoid stale references
+                        jobsHook = self.page.locator("[aria-label='Jobs List']")
+                        jobsHookElements = jobsHook.locator("> *").all()
+                        clickableJobLinks = jobsHookElements[2]
+                        iterativeJobLinks = clickableJobLinks.locator("> *").all()
+                        currentJob = iterativeJobLinks[index]
+
+                        currentJob.scroll_into_view_if_needed()
+                        print(f"Clicking element {index + 1}...")
+                        jobText = currentJob.text_content() or ""
+                        print(jobText)
+                        currentJob.click()
+
+                        jobName = jobText.split('\n')[0]
+
+                        self.page.wait_for_timeout(1000)
+                        value = self.applyToSelectedJob(jobName, progress_callback)
+                        if not value:
+                            continue
+                        else:
+                            results["applications_submitted"] += 1
+                    except Exception as e:
+                        if progress_callback:
+                            progress_callback(f"Could not click element {index + 1}: {e}")
                         continue
-                    else:
-                        results["applications_submitted"] += 1
-                except Exception as e:
-                    if progress_callback:
-                        progress_callback(f"Could not click element {index + 1}: {e}")
-                    continue
         except Exception as e:
             error_msg = f"Session error: {str(e)}"
             print(error_msg)
@@ -631,11 +538,11 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
                 progress_callback(error_msg, "error")
 
         finally:
-            if self.driver is not None:
+            if self.browser_manager is not None:
                 try:
                     print("\nClosing browser in 30 seconds...")
                     time.sleep(30)
-                    self.driver.quit()
+                    self.browser_manager.close()
                     print("Browser closed successfully.")
                 except Exception as e:
                     print(f"Warning: Error closing browser: {str(e)}")
@@ -663,46 +570,45 @@ Return ONLY the coordinates string in quotes, nothing else. No JSON, no markdown
         """
         try:
             # ADD FUNCTIONALITY TO SEE IF APPLY BUTTON IS THE RIGHT ONE. RETURN FALSE IF NOT.
-            applyButton=self.driver.find_element(By.CSS_SELECTOR, "button[class^='sc-hhOBVt']")
-            if applyButton.text=="Apply":
+            applyButton = self.page.locator("button[class^='sc-hhOBVt']").first
+            if applyButton.text_content() == "Apply":
                 print("Correct Apply Button Found")
-            
+
             # Expand job description to get full details
                 print('📋 Extracting job details...')
                 if progress_callback:
                     progress_callback("Extracting job details...", "in-progress")
-                expandJobDescription = self.driver.find_elements(By.CSS_SELECTOR, "button[class^='sc-kAuIVs']")[1]
-                print(expandJobDescription.text)
-                
-                self.driver.execute_script("arguments[0].scrollIntoView();", expandJobDescription)
-                expandJobDescription = self.driver.find_elements(By.CSS_SELECTOR, "button[class^='sc-kAuIVs']")[1]
+                expandJobDescriptionElements = self.page.locator("button[class^='sc-kAuIVs']").all()
+                if len(expandJobDescriptionElements) > 1:
+                    expandJobDescription = expandJobDescriptionElements[1]
+                    print(expandJobDescription.text_content())
 
+                    expandJobDescription.scroll_into_view_if_needed()
+                    expandJobDescription.click()
+                    self.page.wait_for_timeout(2000)
+                    print('✅ Job description expanded')
 
-                expandJobDescription.click()
-                time.sleep(2)
-                print('✅ Job description expanded')
-                
                 try:
-                    job_title_element = self.driver.find_element(By.CSS_SELECTOR, "h1[class^='sc-']")
-                    job_title = job_title_element.text.strip()
+                    job_title_element = self.page.locator("h1[class^='sc-']").first
+                    job_title = (job_title_element.text_content() or "").strip()
                 except:
                     job_title = "Unknown Position"
 
-                #FIX THIS PART
-                company_name=job_name
+                # FIX THIS PART
+                company_name = job_name
 
                 # Extract job description
                 try:
-                    job_description = self.driver.find_element(By.XPATH, "//*[text()='At a glance']/ancestor::div[3]/div[5]/div[1]").text
+                    job_description = self.page.locator("xpath=//*[text()='At a glance']/ancestor::div[3]/div[5]/div[1]").text_content() or ""
                 except:
                     # Fallback: try to get any visible job description
                     try:
-                        job_description = self.driver.find_element(By.CSS_SELECTOR, "[class*='description']").text
+                        job_description = self.page.locator("[class*='description']").first.text_content() or ""
                     except:
                         job_description = "No job description available"
 
                 # Extract job ID from URL
-                current_url = self.driver.current_url
+                current_url = self.page.url
                 job_id = current_url.split('/')[-1].split('?')[0] if '/' in current_url else f"{company_name}_{job_title}_{int(time.time())}"
 
                 print(f'\n✅ Job Details Extracted:')

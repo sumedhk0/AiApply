@@ -1,10 +1,11 @@
 import json
 import requests
 import os
-from anthropic import Anthropic
 import FindEmailWorkFlowV2
 import SendEmailWorkFlowV2
 import setup
+from llm_client import get_client
+from pdf_utils import extract_text_from_pdf
 
 # Hunter.io API Key - Replace with your actual API key
 HUNTER_API_KEY = setup.HUNTER_API_KEY
@@ -57,13 +58,13 @@ def load_legacy_excel_emails(excel_path="Workflow Company Log.xlsx"):
 
     return emails, domains
 
-def askClaudeToFindCompanies(api_key, location="Atlanta", industry="Clean Tech", num_companies=5):
+def askClaudeToFindCompanies(api_key=None, location="Atlanta", industry="Clean Tech", num_companies=5):
     """
-    Uses Claude API to find startup companies based on location and industry.
+    Uses OpenRouter API to find startup companies based on location and industry.
     Returns only company names and domains (no emails or contacts).
 
     Args:
-        api_key: Anthropic API key for Claude API access
+        api_key: Deprecated, kept for backwards compatibility
         location: City or region to search for companies (default: "Atlanta")
         industry: Industry type to target (default: "Clean Tech")
         num_companies: Number of companies to find (default: 5)
@@ -71,7 +72,7 @@ def askClaudeToFindCompanies(api_key, location="Atlanta", industry="Clean Tech",
     Returns:
         list: List of dicts with keys: company_name, domain
     """
-    client = Anthropic(api_key=api_key)
+    client = get_client()
 
     # Build industry-specific guidance
     industry_examples = ""
@@ -88,49 +89,40 @@ def askClaudeToFindCompanies(api_key, location="Atlanta", industry="Clean Tech",
     else:
         industry_examples = f"({industry} related technologies and services)"
 
-    message = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
-        max_tokens=4096,
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    "Return only a valid JSON array of objects with exactly two fields: "
-                    "company_name, domain.\n\n"
-                    f"Find {num_companies} real, actively operating {industry} companies based in the {location} area. "
-                    "These should be companies you have high confidence actually exist.\n\n"
+    prompt = (
+        "Return only a valid JSON array of objects with exactly two fields: "
+        "company_name, domain.\n\n"
+        f"Find {num_companies} real, actively operating {industry} companies based in the {location} area. "
+        "These should be companies you have high confidence actually exist.\n\n"
 
-                    "DOMAIN REQUIREMENTS:\n"
-                    "- Provide the company's primary website domain (e.g., 'acmesolar.com', NOT 'www.acmesolar.com' or 'https://acmesolar.com')\n"
-                    "- The domain should be the company's actual corporate domain\n"
-                    "- Do NOT include protocol (http/https) or subdomains (www)\n"
-                    "- ONLY include domains you are highly confident are correct\n"
-                    "- If you cannot find the correct domain for a company, SKIP IT entirely\n\n"
+        "DOMAIN REQUIREMENTS:\n"
+        "- Provide the company's primary website domain (e.g., 'acmesolar.com', NOT 'www.acmesolar.com' or 'https://acmesolar.com')\n"
+        "- The domain should be the company's actual corporate domain\n"
+        "- Do NOT include protocol (http/https) or subdomains (www)\n"
+        "- ONLY include domains you are highly confident are correct\n"
+        "- If you cannot find the correct domain for a company, SKIP IT entirely\n\n"
 
-                    "COMPANY REQUIREMENTS:\n"
-                    f"- Only include companies working in {industry} {industry_examples}\n"
-                    f"- Companies must be based in or have significant presence in {location}\n"
-                    "- **CRITICAL: ONLY include startups and early-stage companies (NOT established enterprises)**\n"
-                    "- Startups typically have more open internship opportunities and are more responsive\n"
-                    "- Focus on companies with 10-200 employees (smaller is better)\n"
-                    "- Prefer recently founded companies (last 10 years) that are actively growing\n"
-                    "- Only include companies you have high confidence are real and currently operating\n\n"
+        "COMPANY REQUIREMENTS:\n"
+        f"- Only include companies working in {industry} {industry_examples}\n"
+        f"- Companies must be based in or have significant presence in {location}\n"
+        "- **CRITICAL: ONLY include startups and early-stage companies (NOT established enterprises)**\n"
+        "- Startups typically have more open internship opportunities and are more responsive\n"
+        "- Focus on companies with 10-200 employees (smaller is better)\n"
+        "- Prefer recently founded companies (last 10 years) that are actively growing\n"
+        "- Only include companies you have high confidence are real and currently operating\n\n"
 
-                    "QUALITY OVER QUANTITY:\n"
-                    f"- It is better to return fewer than {num_companies} companies with REAL domains\n"
-                    f"- than to return {num_companies} companies with guessed or uncertain domains\n"
-                    "- Each entry should represent a real company you can verify exists\n\n"
+        "QUALITY OVER QUANTITY:\n"
+        f"- It is better to return fewer than {num_companies} companies with REAL domains\n"
+        f"- than to return {num_companies} companies with guessed or uncertain domains\n"
+        "- Each entry should represent a real company you can verify exists\n\n"
 
-                    "OUTPUT FORMAT:\n"
-                    "- Output only valid JSON with no markdown, explanations, or commentary\n"
-                    "- Example: [{\"company_name\": \"Acme Solar\", \"domain\": \"acmesolar.com\"}]\n"
-                    "- Example: [{\"company_name\": \"Green Energy Solutions\", \"domain\": \"greenenergysolutions.com\"}]"
-                ),
-            }
-        ],
+        "OUTPUT FORMAT:\n"
+        "- Output only valid JSON with no markdown, explanations, or commentary\n"
+        "- Example: [{\"company_name\": \"Acme Solar\", \"domain\": \"acmesolar.com\"}]\n"
+        "- Example: [{\"company_name\": \"Green Energy Solutions\", \"domain\": \"greenenergysolutions.com\"}]"
     )
 
-    response_text = message.content[0].text
+    response_text = client.create_message(prompt, max_tokens=4096)
 
 
     # Clean response text - remove markdown code blocks if present
@@ -284,85 +276,63 @@ def enrichCompaniesWithHunter(companies):
     return contacts
 
 
-def createEmailsUsingClaude(contacts, resume_path, api_key, industry="Clean Tech", custom_message=""):
+def createEmailsUsingClaude(contacts, resume_path, api_key=None, industry="Clean Tech", custom_message=""):
     """
-    Uses Claude API to generate personalized emails for each contact.
+    Uses OpenRouter API to generate personalized emails for each contact.
 
     Args:
         contacts: List of contact dicts from askClaudeToFindContacts
         resume_path: Path to PDF resume file
-        api_key: Anthropic API key for Claude API access
+        api_key: Deprecated, kept for backwards compatibility
         industry: Industry type to tailor email content (default: "Clean Tech")
         custom_message: Optional custom message to incorporate into emails (default: "")
 
     Returns:
         list: List of dicts with company_name, contact_name, email_address, email_body
     """
-    client = Anthropic(api_key=api_key)
+    client = get_client()
 
-    # Read and encode resume
-    with open(resume_path, "rb") as file:
-        import base64
-        file_data = file.read()
-        encoded_file = base64.standard_b64encode(file_data).decode("utf-8")
+    # Extract text from resume PDF
+    resume_text = extract_text_from_pdf(resume_path)
+    if not resume_text:
+        raise ValueError(f"Could not extract text from resume at {resume_path}")
 
-    # Create contact list text for Claude
+    # Create contact list text
     contact_text = json.dumps(contacts, indent=2)
 
-    message = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
-        max_tokens=8000,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            f"You are helping draft personalized internship outreach emails for companies in the {industry} industry. "
-                            f"For each company listed below, create a tailored email that:\n\n"
-                            f"1. References specific work or projects the company is doing in {industry}\n"
-                            f"2. Connects the applicant's background (found in the resume) to the company's mission\n"
-                            f"3. Sounds authentic, human, and genuinely interested (NOT AI-generated)\n"
-                            f"4. Is professional but warm and conversational\n"
-                            f"5. Asks for internship opportunities without being pushy\n\n"
-                            f"6. Keeps the email concise (150-200 words)\n\n"
-                            f"7. Does not fabricate any information about the company or the applicant\n\n"
-                            f"{f'8. Incorporates this specific message/requirement: {custom_message}' if custom_message else ''}\n\n"
-                            f"Example email structure (adapt this based on the resume and each company):\n\n"
-                            f"Hi [Company Name Team],\n\n"
-                            f"I hope you're well. My name is [Name from resume], and I'm a [major/background from resume] student at [university from resume]. "
-                            f"I recently came across [Company Name]'s work on [specific project/technology in {industry}] and was fascinated by [specific technical aspect]. "
-                            f"I've spent time working on [relevant experience from resume], and I'd love to see how these skills might apply in a real-world, high-impact setting like yours. "
-                            f"My interest is to learn from experienced teams and contribute in any way I can, however small. "
-                            f"If there is a way for me to get involved with the technical side at [Company Name], I'd be grateful for the chance to discuss.\n\n"
-                            f"I've attached my resume for reference. Thank you very much for considering this note, and I appreciate any time or advice you can offer.\n\n"
-                            f"Best,\n[Name from resume]\n\n"
-                            f"IMPORTANT:\n"
-                            f"- Research each company and reference their actual work in {industry}\n"
-                            f"- Extract the applicant's name, university, and major from the resume\n"
-                            f"- Match skills from the resume to each company's focus area\n"
-                            f"- Make each email unique - no copy-paste language between companies\n"
-                            f"- Keep emails concise (150-200 words)\n\n"
-                            f"Company contacts:\n{contact_text}\n\n"
-                            f"Return a JSON array with the same contacts but add an 'email_body' field containing the tailored email body. "
-                            f"Do not include subject line or attachment information. Return only valid JSON with no additional text."
-                        ),
-                    },
-                    {
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": encoded_file,
-                        },
-                    },
-                ],
-            }
-        ],
+    prompt = (
+        f"You are helping draft personalized internship outreach emails for companies in the {industry} industry. "
+        f"For each company listed below, create a tailored email that:\n\n"
+        f"1. References specific work or projects the company is doing in {industry}\n"
+        f"2. Connects the applicant's background (found in the resume) to the company's mission\n"
+        f"3. Sounds authentic, human, and genuinely interested (NOT AI-generated)\n"
+        f"4. Is professional but warm and conversational\n"
+        f"5. Asks for internship opportunities without being pushy\n\n"
+        f"6. Keeps the email concise (150-200 words)\n\n"
+        f"7. Does not fabricate any information about the company or the applicant\n\n"
+        f"{f'8. Incorporates this specific message/requirement: {custom_message}' if custom_message else ''}\n\n"
+        f"RESUME CONTENT:\n{resume_text}\n\n"
+        f"Example email structure (adapt this based on the resume and each company):\n\n"
+        f"Hi [Company Name Team],\n\n"
+        f"I hope you're well. My name is [Name from resume], and I'm a [major/background from resume] student at [university from resume]. "
+        f"I recently came across [Company Name]'s work on [specific project/technology in {industry}] and was fascinated by [specific technical aspect]. "
+        f"I've spent time working on [relevant experience from resume], and I'd love to see how these skills might apply in a real-world, high-impact setting like yours. "
+        f"My interest is to learn from experienced teams and contribute in any way I can, however small. "
+        f"If there is a way for me to get involved with the technical side at [Company Name], I'd be grateful for the chance to discuss.\n\n"
+        f"I've attached my resume for reference. Thank you very much for considering this note, and I appreciate any time or advice you can offer.\n\n"
+        f"Best,\n[Name from resume]\n\n"
+        f"IMPORTANT:\n"
+        f"- Research each company and reference their actual work in {industry}\n"
+        f"- Extract the applicant's name, university, and major from the resume\n"
+        f"- Match skills from the resume to each company's focus area\n"
+        f"- Make each email unique - no copy-paste language between companies\n"
+        f"- Keep emails concise (150-200 words)\n\n"
+        f"Company contacts:\n{contact_text}\n\n"
+        f"Return a JSON array with the same contacts but add an 'email_body' field containing the tailored email body. "
+        f"Do not include subject line or attachment information. Return only valid JSON with no additional text."
     )
 
-    response_text = message.content[0].text
+    response_text = client.create_message(prompt, max_tokens=8000)
     
 
     # Clean response text - remove markdown code blocks if present
@@ -437,15 +407,7 @@ def main(
     Returns:
         dict: Email sending results with success/failure counts and emails_sent list
     """
-    # Get API key from environment variable (more secure than hardcoding)
-    import os
-    api_key = setup.API_KEY
-
-    if not api_key:
-        raise ValueError(
-            "ANTHROPIC_API_KEY environment variable not set. "
-            "Please set it with your Claude API key from https://console.anthropic.com/"
-        )
+    # OpenRouter API key is loaded automatically by llm_client
 
     # Initialize user history if not provided
     if user_emails_sent is None:
@@ -486,9 +448,9 @@ def main(
         attempt += 1
         progress(f"Search attempt {attempt}/{max_attempts} (found {len(all_unique_contacts)}/{num_emails} unique contacts so far)...", 'in-progress')
 
-        # Step 1: Find companies using Claude (only company names and domains)
+        # Step 1: Find companies using LLM (only company names and domains)
         progress(f"Searching for {batch_size} {industry} companies...", 'in-progress')
-        companies = askClaudeToFindCompanies(api_key, location, industry, batch_size)
+        companies = askClaudeToFindCompanies(location=location, industry=industry, num_companies=batch_size)
         progress(f"Found {len(companies)} companies", 'success')
 
         if len(companies) == 0:
@@ -551,8 +513,8 @@ def main(
     final_contacts = all_unique_contacts[:num_emails]
 
     # Step 4: Generate personalized emails
-    progress(f"Generating {len(final_contacts)} personalized emails using Claude AI...", 'in-progress')
-    emails_with_bodies = createEmailsUsingClaude(final_contacts, resume_path, api_key, industry, custom_message)
+    progress(f"Generating {len(final_contacts)} personalized emails using AI...", 'in-progress')
+    emails_with_bodies = createEmailsUsingClaude(final_contacts, resume_path, industry=industry, custom_message=custom_message)
     progress(f"Created {len(emails_with_bodies)} personalized emails", 'success')
 
     # Step 5: Send emails

@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Flask web application for automated job outreach combining two workflows:
-1. **Email Campaigns**: Claude API finds contacts → generates personalized emails → sends via SMTP
-2. **Handshake DM Automation**: Selenium automates direct messages to recruiters on Handshake
+1. **Email Campaigns**: OpenRouter LLM finds contacts → generates personalized emails → sends via SMTP
+2. **Handshake DM Automation**: Playwright automates direct messages to recruiters on Handshake
 
 Key features: User authentication, SQLite persistence, real-time SSE progress updates, contact deduplication.
 
@@ -15,10 +15,13 @@ Key features: User authentication, SQLite persistence, real-time SSE progress up
 ```bash
 # Install and start
 pip install -r requirements.txt
+playwright install chromium  # Install Playwright browser
 python app.py  # Access at http://localhost:5000
 
-# Test ChromeDriver (for Handshake)
-python test_chromedriver.py
+# Test Playwright and LLM client
+python test_playwright.py          # Test browser automation
+python test_playwright.py --llm    # Test OpenRouter LLM client
+python test_playwright.py --all    # Test both
 
 # Run database migrations when schema changes
 python migrate_db.py
@@ -38,18 +41,18 @@ Three-stage **in-memory** pipeline (no intermediate files):
    - Checks both user history (DB) and global `workflow_company_log.json`
 
 3. **Email Generation & Sending**:
-   - `createEmailsUsingClaude(contacts, resume_path, custom_message)` → adds `email_body` field (resume as base64)
+   - `createEmailsUsingClaude(contacts, resume_path, custom_message)` → adds `email_body` field (resume extracted as text)
    - `SendEmailWorkFlowV2.main()` → sends via `SimpleEmailer` with rate limiting
 
 ### Handshake DM Workflow
 Browser automation with manual login (`HandshakeDMAutomation.py`):
 
-1. Selenium WebDriver opens Chrome (visible, not headless)
+1. Playwright opens Chromium browser (visible, not headless)
 2. User logs in manually → clicks "I'm Logged In" UI button
-3. Claude API maps user's industry to Handshake taxonomy + geocodes city
+3. OpenRouter LLM maps user's industry to Handshake taxonomy + geocodes city
 4. `sendAllDMs()` iterates employer pages:
    - Checks `handshake_dm_log.json` for duplicates
-   - Finds recruiter profiles → generates personalized message (Claude + resume PDF)
+   - Finds recruiter profiles → generates personalized message (LLM + resume text)
    - Automates Message button → enters text → sends
    - Saves company to log after success
 
@@ -82,9 +85,10 @@ Methods: `get_contacted_domains()`, `add_sent_emails()`, `add_contact_history()`
 ## Key Implementation Details
 
 ### API Configuration
-- **Claude API key**: `setup.py` as `API_KEY` (⚠️ DO NOT commit `setup.py` - add to `.gitignore`)
+- **OpenRouter API key**: Environment variable `OPENROUTER_API_KEY` in `.env` file
+- **LLM Client**: `llm_client.py` provides singleton wrapper using OpenAI SDK with OpenRouter base URL
 - **SMTP credentials**: Per-user in DB (`User.sender_email`, `User.sender_password`)
-- **Current model**: `claude-sonnet-4-20250514` (update in `EmailFinderUsingClaude.py` and `HandshakeDMAutomation.py`)
+- **Current model**: `xiaomi/mimo-v2-flash:free` (configured in `llm_client.py`)
 
 ### Deduplication Strategy
 **Email**: Check `User.emails_sent_history` + `User.get_contacted_domains()` + `workflow_company_log.json`
@@ -92,12 +96,12 @@ Methods: `get_contacted_domains()`, `add_sent_emails()`, `add_contact_history()`
 
 Both systems prevent re-contacting same company/domain.
 
-### Claude Prompt Patterns
+### LLM Prompt Patterns
 1. **Contact Discovery**: Returns JSON `[{company_name, contact_name, email_address}]` with `contact_name: null` for generic emails
-2. **Email Generation**: Resume PDF as base64 document attachment → JSON with `email_body` field
+2. **Email Generation**: Resume text extracted via `pdf_utils.py` → JSON with `email_body` field
 3. **Handshake Industry**: Maps user input to 100+ Handshake categories (cleantech forced to "Utilities & Renewable Energy")
 4. **Handshake Location**: Converts "City, State" to lat/long (requires comma in input)
-5. **Handshake DM**: 3-4 sentence limit, resume PDF attachment, handles "Dr. Name\nTitle" format
+5. **Handshake DM**: 3-4 sentence limit, resume text included in prompt, handles "Dr. Name\nTitle" format
 
 ### SimpleEmailer (`SimpleEmailer.py`)
 - Auto-detects SMTP server from email domain (Gmail, Office365, Yahoo, etc.)
@@ -105,13 +109,14 @@ Both systems prevent re-contacting same company/domain.
 - Logs to `email_log_YYYYMMDD.log`
 - Subject line hardcoded in `SendEmailWorkFlowV2.py:18`
 
-### Handshake Automation Quirks
+### Handshake Automation (Playwright)
 - Browser visible by default (users see automation)
 - Manual login required (no credential storage)
 - 30-second wait before closing browser
-- Multiple XPath selectors tried in sequence (Handshake DOM changes)
+- Multiple CSS/XPath selectors tried via `find_element_with_fallback()` (Handshake DOM changes)
 - URL encoding: `[]` → `%5B%5D` for filter URLs
 - Requires `Industry Codes Handshake.xlsx` for industry code lookup
+- Anti-detection: `playwright-stealth` + custom init scripts to hide automation
 
 ## Common Development Tasks
 
@@ -138,6 +143,7 @@ if progress_callback:
 
 ### Test Individual Modules
 ```bash
+python test_playwright.py          # Test browser + LLM setup
 python EmailFinderUsingClaude.py   # Update credentials in __main__ block
 python HandshakeDMAutomation.py
 python SimpleEmailer.py
@@ -151,9 +157,15 @@ python SimpleEmailer.py
 **Email logs**: `email_log_YYYYMMDD.log`
 **Temp uploads**: `uploads/` (cleaned after processing)
 
+### Utility Modules
+- **`llm_client.py`**: OpenRouter API wrapper using OpenAI SDK, singleton pattern via `get_client()`
+- **`pdf_utils.py`**: PDF text extraction using PyPDF2
+- **`browser_utils.py`**: Playwright browser manager with anti-detection, helper functions `find_element_with_fallback()`, `scroll_to_bottom()`
+
 ## Known Limitations
 
-- **Security**: API keys in `setup.py`, unencrypted SMTP passwords in DB, placeholder Flask secret key
+- **Security**: API keys in `.env` file, unencrypted SMTP passwords in DB, placeholder Flask secret key
 - **Scalability**: SQLite (single-threaded writes), in-memory SSE queues, no Celery
-- **Error Handling**: No retry logic for Claude API/SMTP failures, brittle XPath selectors for Handshake DOM
-- **Platform**: Windows paths, Chrome required, Selenium may break on Chrome updates
+- **Error Handling**: No retry logic for OpenRouter API/SMTP failures, brittle selectors for Handshake DOM
+- **Platform**: Windows paths, Chromium required (auto-installed via `playwright install chromium`)
+- **LLM**: MiMo v2 Flash doesn't support PDF attachments; PDFs are converted to text first

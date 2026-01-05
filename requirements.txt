@@ -1,5 +1,5 @@
-# Core AI and API
-anthropic>=0.18.0
+# Core AI and API (OpenRouter with OpenAI SDK)
+openai>=1.0.0
 requests>=2.31.0
 
 # Web Framework and Authentication
@@ -8,9 +8,9 @@ werkzeug>=3.0.0
 flask-login>=0.6.3
 flask-sqlalchemy>=3.1.1
 
-# Browser Automation (Handshake DM feature)
-selenium>=4.15.0
-webdriver-manager>=4.0.1
+# Browser Automation (Playwright for Vercel compatibility)
+playwright>=1.40.0
+playwright-stealth>=1.0.0
 
 # Excel File Processing (for legacy Workflow Company Log)
 pandas>=2.0.0

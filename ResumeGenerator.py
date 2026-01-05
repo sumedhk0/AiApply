@@ -1,22 +1,21 @@
 """
 Resume Generation Module for ATS Optimization
 
-This module uses Claude API to analyze job descriptions and tailor resumes
-to be ATS-optimized. It generates professional LaTeX resumes using PyLaTeX.
+This module uses OpenRouter API (MiMo v2 Flash) to analyze job descriptions
+and tailor resumes to be ATS-optimized. It generates professional LaTeX resumes.
 """
 
 import os
 import re
 import json
 import shutil
-import anthropic
-import setup
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from pylatex import Document, Section, Subsection, Command, Package
 from pylatex.utils import NoEscape, bold, italic
 from PyPDF2 import PdfReader
+from llm_client import get_client
 
 
 def check_latex_installation():
@@ -57,12 +56,7 @@ class ATSResumeGenerator:
             warn_latex: Whether to warn about missing LaTeX installation
         """
         self.original_resume_path = original_resume_path
-        self.claude_api_key = setup.API_KEY
-
-        if not self.claude_api_key or not self.claude_api_key.startswith('sk-ant-'):
-            raise ValueError("Invalid API key in setup.py")
-
-        self.claude_client = anthropic.Anthropic(api_key=self.claude_api_key)
+        self.llm_client = get_client()
 
         # Create directories for generated resumes
         self.generated_resumes_dir = os.path.join(os.path.dirname(__file__), "generated_resumes")
@@ -199,14 +193,8 @@ Return ONLY a JSON object with the following structure (no markdown, no code blo
 IMPORTANT: Wrap items to be bolded with **double asterisks** in the bullet points. Include all relevant sections that exist in the original resume. If a section doesn't exist or isn't relevant, include it as an empty array or omit it. Focus on making this resume highly tailored to the {job_title} position at {company_name}."""
 
         try:
-            response = self.claude_client.messages.create(
-                model="claude-sonnet-4-5-20250929",
-                max_tokens=4000,
-                messages=[{"role": "user", "content": prompt}]
-            )
-
-            # Parse response
-            response_text = response.content[0].text.strip()
+            response_text = self.llm_client.create_message(prompt, max_tokens=4000)
+            response_text = response_text.strip()
 
             # Remove markdown code blocks if present
             if response_text.startswith("```"):

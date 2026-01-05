@@ -26,7 +26,8 @@
       "Bash(pdflatex:*)",
       "Bash(initexmf:*)",
       "Bash(del /Q \"C:\\Users\\sumedh\\OneDrive - Georgia Institute of Technology\\Python\\Anthropic Hackathon - AI Apply\\generated_resumes\\*.*\")",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

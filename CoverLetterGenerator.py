@@ -1,20 +1,19 @@
 """
 Cover Letter Generation Module for ATS Optimization
 
-This module uses Claude API to analyze job descriptions and generate
-tailored cover letters as professional LaTeX PDFs.
+This module uses OpenRouter API (MiMo v2 Flash) to analyze job descriptions
+and generate tailored cover letters as professional LaTeX PDFs.
 """
 
 import os
 import re
 import json
 import shutil
-import anthropic
-import setup
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from PyPDF2 import PdfReader
+from llm_client import get_client
 
 
 def check_latex_installation():
@@ -59,12 +58,7 @@ class ATSCoverLetterGenerator:
         self.resume_text = resume_text
         self.candidate_name = candidate_name
         self.candidate_email = candidate_email
-        self.claude_api_key = setup.API_KEY
-
-        if not self.claude_api_key or not self.claude_api_key.startswith('sk-ant-'):
-            raise ValueError("Invalid API key in setup.py")
-
-        self.claude_client = anthropic.Anthropic(api_key=self.claude_api_key)
+        self.llm_client = get_client()
 
         # Create directories for generated cover letters
         self.generated_letters_dir = os.path.join(os.path.dirname(__file__), "generated_cover_letters")
@@ -124,14 +118,8 @@ Return ONLY a JSON object with the following structure (no markdown, no code blo
 IMPORTANT: Each paragraph should be a complete, grammatically correct paragraph. Do not use placeholder text."""
 
         try:
-            response = self.claude_client.messages.create(
-                model="claude-sonnet-4-5-20250929",
-                max_tokens=2000,
-                messages=[{"role": "user", "content": prompt}]
-            )
-
-            # Parse response
-            response_text = response.content[0].text.strip()
+            response_text = self.llm_client.create_message(prompt, max_tokens=2000)
+            response_text = response_text.strip()
 
             # Remove markdown code blocks if present
             if response_text.startswith("```"):
