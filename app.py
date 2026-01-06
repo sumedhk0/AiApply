@@ -13,13 +13,30 @@ import HandshakeJobApply
 from models import db, User
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here-change-in-production'  # Change this in production
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['RESUMES_FOLDER'] = 'user_resumes'
-app.config['TRANSCRIPTS_FOLDER'] = 'user_transcripts'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-here-change-in-production')
+
+# Check if running on Hugging Face Spaces (persistent storage at /data)
+if os.environ.get('SPACE_ID'):
+    # HF Spaces: use /data for persistent storage
+    data_dir = '/data'
+    os.makedirs(data_dir, exist_ok=True)
+    app.config['UPLOAD_FOLDER'] = f'{data_dir}/uploads'
+    app.config['RESUMES_FOLDER'] = f'{data_dir}/user_resumes'
+    app.config['TRANSCRIPTS_FOLDER'] = f'{data_dir}/user_transcripts'
+    database_url = f'sqlite:///{data_dir}/users.db'
+else:
+    # Local development
+    app.config['UPLOAD_FOLDER'] = 'uploads'
+    app.config['RESUMES_FOLDER'] = 'user_resumes'
+    app.config['TRANSCRIPTS_FOLDER'] = 'user_transcripts'
+    database_url = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
+    # Railway PostgreSQL uses postgres:// but SQLAlchemy needs postgresql://
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
 app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25MB max file size
 app.config['ALLOWED_EXTENSIONS'] = {'pdf'}
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -947,16 +964,28 @@ if __name__ == '__main__':
         db.create_all()
         print("Database tables created successfully!")
 
-    # Check if production mode is requested
-    if not('--development' in sys.argv):
-        # Use Waitress for stable production server (no auto-reload)
-        print("Starting application in PRODUCTION mode with Waitress...")
-        print("Server running at http://127.0.0.1:5000")
+    # Get port from environment (HF Spaces uses 7860, others may set PORT)
+    port = int(os.environ.get('PORT', 7860))
+
+    # Check if running on cloud platform
+    if os.environ.get('SPACE_ID'):
+        # Hugging Face Spaces
+        print(f"Starting application on Hugging Face Spaces (port {port})...")
+        from waitress import serve
+        serve(app, host='0.0.0.0', port=port)
+    elif os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'):
+        # Railway or Render
+        print(f"Starting application in CLOUD mode with Waitress on port {port}...")
+        from waitress import serve
+        serve(app, host='0.0.0.0', port=port)
+    elif '--development' in sys.argv:
+        # Use Flask development server with debug mode
+        print("Starting application in DEVELOPMENT mode with Flask debug server...")
+        print("Auto-reload enabled.")
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    else:
+        # Local production mode with Waitress
+        print(f"Starting application in PRODUCTION mode with Waitress on port 5000...")
         print("Press CTRL+C to quit")
         from waitress import serve
         serve(app, host='127.0.0.1', port=5000)
-    else:
-        # Use Flask development server with debug mode
-        print("Starting application in DEVELOPMENT mode with Flask debug server...")
-        print("Auto-reload enabled. Use --production flag to disable auto-reload.")
-        app.run(debug=True, host='0.0.0.0', port=5000)

@@ -52,9 +52,19 @@ class HandshakeJobApplicator:
     def setup_driver(self):
         """Set up Playwright browser with appropriate options."""
         try:
-            self.browser_manager = BrowserManager(headless=self.headless)
-            self.page = self.browser_manager.setup()
-            print(f"Playwright browser initialized successfully")
+            browserless_url = os.getenv('BROWSERLESS_URL')
+
+            if browserless_url:
+                # Connect to remote browser (Browserless.io for cloud deployment)
+                print("Connecting to remote browser (Browserless.io)...")
+                self.browser_manager = BrowserManager(headless=False)
+                self.page = self.browser_manager.setup(remote_url=browserless_url)
+                print("Connected to remote browser successfully")
+            else:
+                # Launch local browser
+                self.browser_manager = BrowserManager(headless=self.headless)
+                self.page = self.browser_manager.setup()
+                print("Playwright browser initialized successfully")
 
         except Exception as e:
             print(f"Error setting up Playwright browser: {str(e)}")
@@ -62,6 +72,7 @@ class HandshakeJobApplicator:
             print("1. Run: pip install playwright")
             print("2. Run: playwright install chromium")
             print("3. Close any existing browser instances")
+            print("4. For cloud deployment, set BROWSERLESS_URL environment variable")
             raise
 
     def load_applied_jobs(self):
