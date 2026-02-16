@@ -8,9 +8,14 @@ import json
 import time
 from werkzeug.utils import secure_filename
 import EmailFinderUsingClaude
-import HandshakeDMAutomation
-import HandshakeJobApply
 from models import db, User
+
+# Detect cloud deployment (Handshake Playwright features disabled in cloud)
+IS_CLOUD = bool(os.environ.get('RENDER') or os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('SPACE_ID'))
+
+if not IS_CLOUD:
+    import HandshakeDMAutomation
+    import HandshakeJobApply
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-here-change-in-production')
@@ -25,12 +30,12 @@ if os.environ.get('SPACE_ID'):
     app.config['TRANSCRIPTS_FOLDER'] = f'{data_dir}/user_transcripts'
     database_url = f'sqlite:///{data_dir}/users.db'
 else:
-    # Local development
+    # Local development or cloud (Render/Railway)
     app.config['UPLOAD_FOLDER'] = 'uploads'
     app.config['RESUMES_FOLDER'] = 'user_resumes'
     app.config['TRANSCRIPTS_FOLDER'] = 'user_transcripts'
     database_url = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
-    # Railway PostgreSQL uses postgres:// but SQLAlchemy needs postgresql://
+    # Railway/Render PostgreSQL uses postgres:// but SQLAlchemy needs postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
@@ -84,7 +89,7 @@ def utility_processor():
             return parts[2]
         return user.resume_filename
 
-    return dict(get_original_resume_name=get_original_resume_name)
+    return dict(get_original_resume_name=get_original_resume_name, is_cloud=IS_CLOUD)
 
 def allowed_file(filename):
     """Check if the uploaded file has an allowed extension."""
@@ -415,6 +420,8 @@ def progress(task_id):
 @login_required
 def submit_handshake():
     """Handle Handshake DM campaign submission."""
+    if IS_CLOUD:
+        return jsonify({'error': 'Handshake automation is not available in cloud deployment'}), 404
 
     # Get form inputs
     city = request.form.get('city', '').strip()
@@ -535,6 +542,8 @@ def submit_handshake():
 @login_required
 def api_handshake_applications():
     """API endpoint to get Handshake job applications history as JSON."""
+    if IS_CLOUD:
+        return jsonify({'error': 'Handshake automation is not available in cloud deployment'}), 404
     applications_history = current_user.get_handshake_applications_history()
     # Filter out None entries and sort by applied_date descending (most recent first)
     applications_history = [app for app in applications_history if app is not None and isinstance(app, dict)]
@@ -545,6 +554,8 @@ def api_handshake_applications():
 @login_required
 def confirm_handshake_login(task_id):
     """Handle Handshake login confirmation from user."""
+    if IS_CLOUD:
+        return jsonify({'error': 'Handshake automation is not available in cloud deployment'}), 404
     if task_id in handshake_login_confirmed:
         handshake_login_confirmed[task_id] = True
         return jsonify({'status': 'success', 'message': 'Login confirmed'})
@@ -555,6 +566,8 @@ def confirm_handshake_login(task_id):
 @login_required
 def submit_job_application():
     """Handle Handshake job application session submission."""
+    if IS_CLOUD:
+        return jsonify({'error': 'Handshake automation is not available in cloud deployment'}), 404
 
     # Get form inputs
     industry = request.form.get('industry', '').strip()
@@ -956,13 +969,14 @@ def delete_transcript():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Create database tables on import (needed for gunicorn which doesn't run __main__)
+with app.app_context():
+    db.create_all()
+
 if __name__ == '__main__':
     import sys
 
-    # Create database tables
-    with app.app_context():
-        db.create_all()
-        print("Database tables created successfully!")
+    print("Database tables created successfully!")
 
     # Get port from environment (HF Spaces uses 7860, others may set PORT)
     port = int(os.environ.get('PORT', 7860))

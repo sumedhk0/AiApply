@@ -612,8 +612,10 @@
         <!-- Tabs Navigation -->
         <div class="tabs">
             <button class="tab-button active" onclick="switchTab('campaign')">Email Campaign</button>
+            {% if not is_cloud %}
             <button class="tab-button" onclick="switchTab('handshake')">Handshake DMs</button>
             <button class="tab-button" onclick="switchTab('jobapply')">Job Applications</button>
+            {% endif %}
             <button class="tab-button" onclick="switchTab('resume')">Documents</button>
         </div>
 
@@ -727,6 +729,7 @@
         </div>
         <!-- End Campaign Tab -->
 
+        {% if not is_cloud %}
         <!-- Handshake DM Tab Content -->
         <div id="handshake-tab" class="tab-content">
             <form id="handshakeForm">
@@ -825,6 +828,7 @@
         <!-- End Handshake DM Tab -->
 
         <!-- Job Applications Tab Content -->
+
         <div id="jobapply-tab" class="tab-content">
             <form id="jobApplicationForm">
                 <div class="section-header">
@@ -921,6 +925,7 @@
             <div class="divider"></div>
         </div>
         <!-- End Job Applications Tab -->
+        {% endif %}
 
         <!-- Documents Management Tab -->
         <div id="resume-tab" class="tab-content">
@@ -1552,6 +1557,7 @@
             .catch(error => alert('Error: ' + error.message));
         }
 
+        {% if not is_cloud %}
         // Handshake DM functionality
         let handshakeEventSource = null;
         let currentHandshakeTaskId = null;
@@ -1792,6 +1798,7 @@
                 addJobApplicationProgressItem('Error: ' + error.message, 'error');
             });
         });
+        {% endif %}
     </script>
 </body>
 </html>
