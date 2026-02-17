@@ -3,12 +3,11 @@ import requests
 import os
 import FindEmailWorkFlowV2
 import SendEmailWorkFlowV2
-import setup
 from llm_client import get_client
 from pdf_utils import extract_text_from_pdf
 
-# Hunter.io API Key - Replace with your actual API key
-HUNTER_API_KEY = setup.HUNTER_API_KEY
+# Hunter.io API Key - from environment variable
+HUNTER_API_KEY = os.environ.get('HUNTER_API_KEY', '')
 
 
 def load_legacy_excel_emails(excel_path="Workflow Company Log.xlsx"):
