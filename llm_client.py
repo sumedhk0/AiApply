@@ -1,6 +1,6 @@
 """
 LLM Client Wrapper for OpenRouter API
-Provides a unified interface for OpenRouter models (MiMo v2 Flash).
+Provides a unified interface for OpenRouter models (Arcee Trinity Large Preview).
 """
 import os
 from openai import OpenAI
@@ -26,7 +26,7 @@ class LLMClient:
             base_url="https://openrouter.ai/api/v1",
             api_key=self.api_key
         )
-        self.model = "xiaomi/mimo-v2-flash:free"
+        self.model = "arcee-ai/trinity-large-preview:free"
 
     def create_message(self, prompt, max_tokens=4096, system_prompt=None):
         """
